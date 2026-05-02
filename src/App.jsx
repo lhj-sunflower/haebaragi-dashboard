@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  'https://wtvhghduhnyefewuvcpc.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0dmhnaGR1aG55ZWZld3V2Y3BjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2ODg5NjksImV4cCI6MjA5MzI2NDk2OX0.fyjCAAszJqaBi8c0NdiUZdGlPOFlMOoUwoAdvQbdOUY'
+)
 const STORAGE_KEY = 'haebaragi-puppyhouse-final-dashboard-v3'
 const LEGACY_KEY = 'haebaragi-puppyhouse-final-dashboard-v2'
 const today = '2026-05-02'
@@ -25,6 +31,16 @@ const adoptionMenus = ['퍼피 매칭관리', '퍼피 프로파일', '퍼피 입
 const settlementStatusList = ['미정산', '정산완료', '확인필요']
 const processStatusList = ['처리완료', '확인필요', '대기']
 const accountingTabs = ['당일 수익·비용', '월별 장부', '수익/비용 내역', '영수증 관리', '예슬님 정산']
+const SUPABASE_TABLES = {
+  customers: 'customers',
+  groomingReservations: 'grooming_reservations',
+  adoptionConsultations: 'adoption_consultations',
+  puppies: 'puppies',
+  supplyPurchases: 'supply_purchases',
+  accountingEntries: 'accounting_entries',
+  settlementEntries: 'settlement_entries',
+}
+const SUPABASE_DATA_KEYS = ['groomingReservations', 'adoptionConsultations', 'puppies', 'supplyPurchases', 'accountingEntries', 'settlementEntries']
 
 const seedData = {
   groomingReservations: [
@@ -315,6 +331,52 @@ function settlementFromGrooming(item, previous) {
     memo: old?.memo || '',
   }
 }
+function supabaseRowId(item, fallback) {
+  return String(item?.id || item?.phone || item?.profileNo || fallback)
+}
+function collectionRowsForSupabase(key, rows) {
+  return (rows || []).map((item, index) => ({ id: supabaseRowId(item, key + '-' + index), data: item }))
+}
+async function readSupabaseCollection(key) {
+  const table = SUPABASE_TABLES[key]
+  if (!table) return []
+  const { data: rows, error } = await supabase.from(table).select('id,data').order('updated_at', { ascending: false })
+  if (error) throw error
+  return (rows || []).map((row) => ({ id: row.id, ...(row.data || {}) }))
+}
+async function loadSupabaseDashboardData() {
+  const result = {}
+  let foundRemoteRows = false
+  await Promise.all(SUPABASE_DATA_KEYS.map(async (key) => {
+    const rows = await readSupabaseCollection(key)
+    result[key] = rows
+    if (rows.length > 0) foundRemoteRows = true
+  }))
+  return foundRemoteRows ? normalizeData({ ...seedData, ...result }) : null
+}
+async function syncSupabaseCollection(key, rows) {
+  const table = SUPABASE_TABLES[key]
+  if (!table) return
+  const localRows = collectionRowsForSupabase(key, rows)
+  const localIds = new Set(localRows.map((row) => row.id))
+  if (localRows.length > 0) {
+    const { error } = await supabase.from(table).upsert(localRows, { onConflict: 'id' })
+    if (error) throw error
+  }
+  const { data: remoteRows, error: selectError } = await supabase.from(table).select('id')
+  if (selectError) throw selectError
+  const deleteIds = (remoteRows || []).map((row) => String(row.id)).filter((id) => !localIds.has(id))
+  if (deleteIds.length > 0) {
+    const { error: deleteError } = await supabase.from(table).delete().in('id', deleteIds)
+    if (deleteError) throw deleteError
+  }
+}
+async function syncDashboardToSupabase(data, customers) {
+  await Promise.all([
+    syncSupabaseCollection('customers', customers),
+    ...SUPABASE_DATA_KEYS.map((key) => syncSupabaseCollection(key, data[key] || [])),
+  ])
+}
 function syncDerivedData(data) {
   const manualEntries = data.accountingEntries.filter((entry) => !['grooming', 'adoption', 'supply'].includes(entry.sourceKind))
   const groomingEntries = data.groomingReservations.filter((item) => item.paymentStatus === '결제완료').map(accountingFromGrooming)
@@ -334,6 +396,13 @@ function normalizeData(raw) {
     settlementEntries: legacy.settlementEntries || seedData.settlementEntries,
   }
   return syncDerivedData(normalized)
+}
+function hasLocalDashboardBackup() {
+  try {
+    return Boolean(localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_KEY))
+  } catch {
+    return false
+  }
 }
 function loadData() {
   try {
@@ -742,7 +811,30 @@ function App() {
   const [accountingForm, setAccountingForm] = useState(defaultAccountingForm)
   const [settlementFilters, setSettlementFilters] = useState({ from: '2026-05-01', to: '2026-05-31', unpaidOnly: false })
   const [accountingTab, setAccountingTab] = useState(accountingTabs[0])
+  const [supabaseLoaded, setSupabaseLoaded] = useState(false)
   const visibleTabs = useMemo(() => isAdmin(loginUser) ? tabs : tabs.filter((tab) => !isRestrictedTab(tab)), [loginUser])
+
+  useEffect(() => {
+    let mounted = true
+    const localBackup = loadData()
+    const shouldUploadLocalBackup = hasLocalDashboardBackup()
+    loadSupabaseDashboardData()
+      .then((remoteData) => {
+        if (!mounted) return
+        if (shouldUploadLocalBackup) {
+          setData(syncDerivedData(localBackup))
+          return
+        }
+        if (remoteData) setData(syncDerivedData(remoteData))
+      })
+      .catch((error) => {
+        console.error('Supabase 데이터 불러오기 실패, localStorage 백업을 사용합니다.', error)
+      })
+      .finally(() => {
+        if (mounted) setSupabaseLoaded(true)
+      })
+    return () => { mounted = false }
+  }, [])
 
   useEffect(() => {
     const normalized = normalizeLoginSession(loginUser)
@@ -776,6 +868,21 @@ function App() {
   const attentionItems = [...data.groomingReservations, ...data.adoptionConsultations].filter((item) => item.date === today && item.status === '확인필요')
   const calendarDays = monthDays(currentMonth, activeGroomingReservations, data.adoptionConsultations)
   const customers = useMemo(() => buildCustomers(data), [data])
+
+  useEffect(() => {
+    localStorage.setItem('customers', JSON.stringify(customers))
+  }, [customers])
+
+  useEffect(() => {
+    if (!supabaseLoaded) return undefined
+    const timer = window.setTimeout(() => {
+      syncDashboardToSupabase(data, customers).catch((error) => {
+        console.error('Supabase 저장 실패, localStorage 백업을 유지합니다.', error)
+      })
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [data, customers, supabaseLoaded])
+
   const selectedCustomer = useMemo(() => customers.find((item) => item.phone === customerPhone) || customers[0] || null, [customerPhone, customers])
   const selectedCustomerHistory = useMemo(() => buildCustomerServiceHistory(data, selectedCustomer || { phone: customerPhone }), [selectedCustomer, customerPhone, data])
   const filteredGrooming = sortByDateTime(data.groomingReservations.filter((item) => {
