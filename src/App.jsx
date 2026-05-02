@@ -464,6 +464,35 @@ function sortByDateTime(data) {
     return parseTimeValue(a.time) - parseTimeValue(b.time)
   })
 }
+function dateOffset(baseDate, offsetDays) {
+  const date = new Date(baseDate + 'T00:00:00')
+  date.setDate(date.getDate() + offsetDays)
+  return date.toISOString().slice(0, 10)
+}
+function currentDateString() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return year + '-' + month + '-' + day
+}
+function currentMinuteOfDay() {
+  const now = new Date()
+  return now.getHours() * 60 + now.getMinutes()
+}
+function minutesUntilReservation(item) {
+  const reservationTime = parseTimeValue(item.time)
+  if (!Number.isFinite(reservationTime)) return Number.POSITIVE_INFINITY
+  const nowMinutes = currentDateString() === item.date ? currentMinuteOfDay() : -1
+  return reservationTime - nowMinutes
+}
+function isUpcomingTodayReservation(item) {
+  return item.date === today && !isCanceledGrooming(item) && minutesUntilReservation(item) >= 0
+}
+function isWithinThirtyMinutes(item) {
+  const minutes = minutesUntilReservation(item)
+  return minutes >= 0 && minutes <= 30
+}
 function monthDays(month, grooming, adoptions) {
   const [year, monthNumber] = month.split('-').map(Number)
   const last = new Date(year, monthNumber, 0).getDate()
@@ -946,8 +975,12 @@ function App() {
     setModal(null)
   }
   function deleteSupply(itemOrId) {
+    if (!isAdmin(loginUser)) {
+      window.alert('삭제는 관리자만 가능합니다.')
+      return
+    }
     const id = typeof itemOrId === 'object' ? itemOrId.id : itemOrId
-    if (!window.confirm('해당 매장용품 매입 내역을 삭제하시겠습니까?')) return
+    if (!window.confirm('정말 삭제하시겠습니까?')) return
     commit((prev) => ({ ...prev, supplyPurchases: prev.supplyPurchases.filter((item) => item.id !== id) }))
     setModal(null)
   }
@@ -1028,8 +1061,12 @@ function App() {
     setModal(null)
   }
   function deleteCustomer(customer) {
+    if (!isAdmin(loginUser)) {
+      window.alert('삭제는 관리자만 가능합니다.')
+      return
+    }
     if (!customer?.phone) return
-    if (!window.confirm('해당 고객 정보를 고객관리 목록에서 삭제하시겠습니까?\n예약/입양/회계 이력은 삭제되지 않습니다.')) return
+    if (!window.confirm('정말 삭제하시겠습니까?')) return
     const phoneKey = phoneDigits(customer.phone)
     setDeletedCustomerPhones((prev) => Array.from(new Set([...prev, phoneKey])))
     setCustomerMemos((prev) => {
@@ -1049,7 +1086,7 @@ function App() {
   if (!loginUser) return <LoginScreen onLogin={setLoginUser} />
   const restricted = isRestrictedTab(activeTab) && !isAdmin(loginUser)
 
-  return <main className="appShell"><aside className="sidebar"><Brand /><nav className="tabs" aria-label="업무 탭">{visibleTabs.map((tab) => <button className={activeTab === tab ? 'active' : ''} key={tab} type="button" onClick={() => setActiveTab(tab)}>{tab}</button>)}</nav></aside><section className="page"><header className="pageHeader"><div><p className="kicker">LOCAL STORAGE · 자동 저장</p><h1>{activeTab}</h1></div><div className="headerTools"><div className="headerPill">현재 사용자: {loginUser.name}</div><button type="button" onClick={() => { localStorage.removeItem(LOGIN_KEY); setLoginUser(null) }}>로그아웃</button></div></header>{restricted && <AccessDenied />}{!restricted && activeTab === '메인' && <MainTab todayGrooming={todayGrooming} todayAdoptions={todayAdoptions} calendarOpen={calendarOpen} setCalendarOpen={setCalendarOpen} calendarDays={calendarDays} data={data} setModal={setModal} />}{!restricted && activeTab === '미용/케어' && <GroomingTab form={groomingForm} setForm={setGroomingForm} addGrooming={addGrooming} filters={groomingFilters} setFilters={setGroomingFilters} rows={filteredGrooming} setModal={setModal} customers={customers} />}{!restricted && activeTab === '분양관리' && <AdoptionTab data={data} menu={adoptionMenu} setMenu={setAdoptionMenu} setModal={setModal} completeAdoption={completeAdoption} />}{!restricted && activeTab === '매장용품관리' && <SupplyTab form={supplyForm} setForm={setSupplyForm} addSupply={addSupply} supplies={data.supplyPurchases} setModal={setModal} deleteSupply={deleteSupply} />}{!restricted && activeTab === '고객관리' && <CustomerTab customers={customers} selectedCustomer={selectedCustomer} phone={customerPhone} setPhone={setCustomerPhone} history={selectedCustomerHistory} setModal={setModal} filter={customerFilter} setFilter={setCustomerFilter} query={customerQuery} setQuery={setCustomerQuery} customerMemos={customerMemos} setCustomerMemos={setCustomerMemos} deleteCustomer={deleteCustomer} />}{!restricted && activeTab === '회계/비용장부' && isAdmin(loginUser) && <LedgerTab activeTab={accountingTab} setActiveTab={setAccountingTab} form={accountingForm} setForm={setAccountingForm} addAccounting={addAccounting} entries={data.accountingEntries} settlements={filteredSettlements} receipts={data.accountingEntries.filter((item) => item.receiptAttached || item.receiptName)} todayIncome={todayIncome} todayExpense={todayExpense} monthIncome={monthIncome} monthExpense={monthExpense} todayYesulSales={todayYesulSales} todayYesulSettlement={todayYesulSettlement} monthYesulSales={monthYesulSales} monthYesulSettlement={monthYesulSettlement} filters={settlementFilters} setFilters={setSettlementFilters} setModal={setModal} />}{!restricted && activeTab === '통합데이터' && isAdmin(loginUser) && <StatsTab data={data} />}</section>{modal && <Modal modal={modal} onClose={() => setModal(null)} saveGrooming={saveGrooming} saveAdoption={saveAdoption} savePuppy={savePuppy} addPuppy={addPuppy} deletePuppy={deletePuppy} completePuppyAdoption={completePuppyAdoption} saveSupply={saveSupply} saveAccounting={saveAccounting} saveSettlement={saveSettlement} completeAdoption={completeAdoption} chooseExistingCustomer={chooseExistingCustomer} createGrooming={createGrooming} setAccountingStatus={setAccountingStatus} setAccountingSettlement={setAccountingSettlement} setSettlementStatus={setSettlementStatus} deleteGrooming={deleteGrooming} deleteAdoption={deleteAdoption} />}</main>
+  return <main className="appShell"><aside className="sidebar"><Brand /><nav className="tabs" aria-label="업무 탭">{visibleTabs.map((tab) => <button className={activeTab === tab ? 'active' : ''} key={tab} type="button" onClick={() => setActiveTab(tab)}>{tab}</button>)}</nav></aside><section className="page"><header className="pageHeader"><div><p className="kicker">LOCAL STORAGE · 자동 저장</p><h1>{activeTab}</h1></div><div className="headerTools"><div className="headerPill">현재 사용자: {loginUser.name}</div><button type="button" onClick={() => { localStorage.removeItem(LOGIN_KEY); setLoginUser(null) }}>로그아웃</button></div></header>{restricted && <AccessDenied />}{!restricted && activeTab === '메인' && <MainTab todayGrooming={todayGrooming} todayAdoptions={todayAdoptions} calendarOpen={calendarOpen} setCalendarOpen={setCalendarOpen} calendarDays={calendarDays} data={data} setModal={setModal} />}{!restricted && activeTab === '미용/케어' && <GroomingTab form={groomingForm} setForm={setGroomingForm} addGrooming={addGrooming} filters={groomingFilters} setFilters={setGroomingFilters} rows={filteredGrooming} setModal={setModal} customers={customers} />}{!restricted && activeTab === '분양관리' && <AdoptionTab data={data} menu={adoptionMenu} setMenu={setAdoptionMenu} setModal={setModal} completeAdoption={completeAdoption} />}{!restricted && activeTab === '매장용품관리' && <SupplyTab form={supplyForm} setForm={setSupplyForm} addSupply={addSupply} supplies={data.supplyPurchases} setModal={setModal} deleteSupply={isAdmin(loginUser) ? deleteSupply : null} />}{!restricted && activeTab === '고객관리' && <CustomerTab customers={customers} selectedCustomer={selectedCustomer} phone={customerPhone} setPhone={setCustomerPhone} history={selectedCustomerHistory} setModal={setModal} filter={customerFilter} setFilter={setCustomerFilter} query={customerQuery} setQuery={setCustomerQuery} customerMemos={customerMemos} setCustomerMemos={setCustomerMemos} deleteCustomer={isAdmin(loginUser) ? deleteCustomer : null} />}{!restricted && activeTab === '회계/비용장부' && isAdmin(loginUser) && <LedgerTab activeTab={accountingTab} setActiveTab={setAccountingTab} form={accountingForm} setForm={setAccountingForm} addAccounting={addAccounting} entries={data.accountingEntries} settlements={filteredSettlements} receipts={data.accountingEntries.filter((item) => item.receiptAttached || item.receiptName)} todayIncome={todayIncome} todayExpense={todayExpense} monthIncome={monthIncome} monthExpense={monthExpense} todayYesulSales={todayYesulSales} todayYesulSettlement={todayYesulSettlement} monthYesulSales={monthYesulSales} monthYesulSettlement={monthYesulSettlement} filters={settlementFilters} setFilters={setSettlementFilters} setModal={setModal} />}{!restricted && activeTab === '통합데이터' && isAdmin(loginUser) && <StatsTab data={data} />}</section>{modal && <Modal modal={modal} onClose={() => setModal(null)} saveGrooming={saveGrooming} saveAdoption={saveAdoption} savePuppy={savePuppy} addPuppy={addPuppy} deletePuppy={deletePuppy} completePuppyAdoption={completePuppyAdoption} saveSupply={saveSupply} saveAccounting={saveAccounting} saveSettlement={saveSettlement} completeAdoption={completeAdoption} chooseExistingCustomer={chooseExistingCustomer} createGrooming={createGrooming} setAccountingStatus={setAccountingStatus} setAccountingSettlement={setAccountingSettlement} setSettlementStatus={setSettlementStatus} deleteGrooming={deleteGrooming} deleteAdoption={deleteAdoption} deleteSupply={isAdmin(loginUser) ? deleteSupply : null} />}</main>
 }
 function roleLabel(role) {
   return { admin: '관리자', user: '사용자' }[role] || role
@@ -1082,7 +1119,14 @@ function staffClass(staff) {
 }
 function MainTab({ todayGrooming, todayAdoptions, calendarOpen, setCalendarOpen, calendarDays, data, setModal }) {
   const cards = [['오늘 미용/케어 예약 건수', todayGrooming.length, todayGrooming], ['오늘 입양상담 건수', todayAdoptions.length, todayAdoptions]]
-  return <div className="stack"><section className="metricGrid mainTwo">{cards.map(([label, value, list]) => <button className="summaryCard" type="button" key={label} onClick={() => setModal({ type: 'list', title: label, list })}><span>{label}</span><strong>{value}</strong><em>상세 보기</em></button>)}</section><section className="peopleGrid"><PersonSchedule title="원장님 오늘 예약현황" rows={sortByDateTime(todayGrooming.filter((item) => item.staff === '원장님'))} setModal={setModal} /><PersonSchedule title="예슬님 오늘 예약현황" rows={sortByDateTime(todayGrooming.filter((item) => item.staff === '예슬님'))} setModal={setModal} /><PersonSchedule title="퍼피 컨설턴트 업무내용" rows={todayAdoptions} setModal={setModal} /></section><section className="panel calendarPanel"><div className="panelTitle"><h2>월별 예약 달력</h2><button type="button" onClick={() => setCalendarOpen((value) => !value)}>{calendarOpen ? '접기' : '펼치기'}</button></div>{calendarOpen && <div className="calendarGrid">{calendarDays.map((day) => day.blank ? <div className="calendarBlank" key={day.key} /> : <button className="calendarDay" type="button" key={day.key} onClick={() => setModal({ type: 'list', title: formatDateWithDay(day.date) + ' 예약내용', list: sortByDateTime([...data.groomingReservations.filter((item) => item.date === day.date && !isCanceledGrooming(item)), ...data.adoptionConsultations.filter((item) => item.date === day.date)]) })}><strong>{day.label}</strong>{day.entries.slice(0, 4).map((item) => <span className={'calItem ' + staffClass(item.staff)} key={item.id}>{item.time || '상담'} · {item.staff || item.consultant}</span>)}{day.entries.length > 4 && <small>외 {day.entries.length - 4}건</small>}</button>)}</div>}</section></div>
+  return <div className="stack"><section className="metricGrid mainTwo">{cards.map(([label, value, list]) => <button className="summaryCard" type="button" key={label} onClick={() => setModal({ type: 'list', title: label, list })}><span>{label}</span><strong>{value}</strong><em>상세 보기</em></button>)}</section><ReservationAlert reservations={data.groomingReservations} setModal={setModal} /><section className="peopleGrid"><PersonSchedule title="원장님 오늘 예약현황" rows={sortByDateTime(todayGrooming.filter((item) => item.staff === '원장님'))} setModal={setModal} /><PersonSchedule title="예슬님 오늘 예약현황" rows={sortByDateTime(todayGrooming.filter((item) => item.staff === '예슬님'))} setModal={setModal} /><PersonSchedule title="퍼피 컨설턴트 업무내용" rows={todayAdoptions} setModal={setModal} /></section><section className="panel calendarPanel"><div className="panelTitle"><h2>월별 예약 달력</h2><button type="button" onClick={() => setCalendarOpen((value) => !value)}>{calendarOpen ? '접기' : '펼치기'}</button></div>{calendarOpen && <div className="calendarGrid">{calendarDays.map((day) => day.blank ? <div className="calendarBlank" key={day.key} /> : <button className="calendarDay" type="button" key={day.key} onClick={() => setModal({ type: 'list', title: formatDateWithDay(day.date) + ' 예약내용', list: sortByDateTime([...data.groomingReservations.filter((item) => item.date === day.date && !isCanceledGrooming(item)), ...data.adoptionConsultations.filter((item) => item.date === day.date)]) })}><strong>{day.label}</strong>{day.entries.slice(0, 4).map((item) => <span className={'calItem ' + staffClass(item.staff)} key={item.id}>{item.time || '상담'} · {item.staff || item.consultant}</span>)}{day.entries.length > 4 && <small>외 {day.entries.length - 4}건</small>}</button>)}</div>}</section></div>
+}
+function ReservationAlert({ reservations, setModal }) {
+  const tomorrow = dateOffset(today, 1)
+  const todayRows = sortByDateTime((reservations || []).filter(isUpcomingTodayReservation))
+  const tomorrowRows = sortByDateTime((reservations || []).filter((item) => item.date === tomorrow && !isCanceledGrooming(item)))
+  const renderRows = (rows, emptyText) => rows.length === 0 ? <p className="reservationAlertEmpty">{emptyText}</p> : <div className="reservationAlertList">{rows.map((item) => <button className={'reservationAlertItem ' + staffClass(item.staff) + (isWithinThirtyMinutes(item) ? ' urgent' : '')} key={item.id} type="button" onClick={() => setModal({ type: 'edit-grooming', title: petLabel(item), item })}><div><strong>{item.time || '-'}</strong><span>{petLabel(item)} · {item.serviceType || '-'}</span></div><em className={'staffBadge ' + staffClass(item.staff)}>{item.staff || '-'}</em>{isWithinThirtyMinutes(item) && <b>30분 이내</b>}</button>)}</div>
+  return <section className="panel reservationAlertPanel"><div className="panelTitle"><h2>예약 알림</h2><span>Supabase 예약 데이터 기준</span></div><div className="reservationAlertGrid"><article><h3>오늘 남은 예약</h3>{renderRows(todayRows, '오늘 남은 예약이 없습니다.')}</article><article><h3>내일 예약</h3>{renderRows(tomorrowRows, '내일 예약이 없습니다.')}</article></div></section>
 }
 function PersonSchedule({ title, rows, setModal }) {
   const sortedRows = sortByDateTime(rows)
@@ -1144,7 +1188,7 @@ function CustomerTab({ customers, selectedCustomer, phone, setPhone, history, se
             <em>견명 {customer.dogName || '-'}</em>
             <div className="badgeRow crmBadges">{customer.badges.map((badge) => <i className={badgeClass(badge)} key={badge}>{badge}</i>)}</div>
           </button>
-          <button className="rowDeleteButton" type="button" onClick={() => deleteCustomer(customer)}>삭제</button>
+          {deleteCustomer && <button className="rowDeleteButton" type="button" onClick={() => deleteCustomer(customer)}>삭제</button>}
         </div>)}</div>
         {filteredCustomers.length === 0 && <p className="empty">조건에 맞는 고객이 없습니다.</p>}
       </section>
@@ -1278,7 +1322,7 @@ function Modal(props) {
   const { modal, onClose } = props
   return <div className="modalBackdrop" role="presentation" onMouseDown={onClose}><section className="modalCard" role="dialog" aria-modal="true" aria-label={modal.title} onMouseDown={(event) => event.stopPropagation()}><div className="modalHeader"><h2>{modal.title}</h2><button type="button" onClick={onClose}>닫기</button></div><ModalBody {...props} /></section></div>
 }
-function ModalBody({ modal, saveGrooming, saveAdoption, savePuppy, addPuppy, deletePuppy, completePuppyAdoption, saveSupply, saveAccounting, saveSettlement, completeAdoption, chooseExistingCustomer, createGrooming, setAccountingStatus, setAccountingSettlement, setSettlementStatus, deleteGrooming, deleteAdoption }) {
+function ModalBody({ modal, saveGrooming, saveAdoption, savePuppy, addPuppy, deletePuppy, completePuppyAdoption, saveSupply, saveAccounting, saveSettlement, completeAdoption, chooseExistingCustomer, createGrooming, setAccountingStatus, setAccountingSettlement, setSettlementStatus, deleteGrooming, deleteAdoption, deleteSupply }) {
   const [draft, setDraft] = useState(modal.item || {})
   if (modal.type === 'booking') return <BookingFlow customers={modal.customers || []} createGrooming={createGrooming} chooseExistingCustomer={chooseExistingCustomer} />
   if (modal.type === 'list') return <div className="modalList">{modal.list.length === 0 ? <p className="empty">표시할 데이터가 없습니다.</p> : sortByDateTime(modal.list).map((item) => <div className="modalLine" key={item.id}><strong>{petLabel(item)}</strong><span>{formatDateWithDay(item.date)} · {item.time || item.status} · {item.staff || item.consultant || ''}</span></div>)}</div>
@@ -1287,7 +1331,7 @@ function ModalBody({ modal, saveGrooming, saveAdoption, savePuppy, addPuppy, del
   if (modal.type === 'edit-adoption') return <EditForm draft={draft} setDraft={setDraft} fields={adoptionFields} onSave={() => saveAdoption(draft)} onDelete={() => deleteAdoption(draft)} extra={draft.status !== '입양완료' && <button className="primaryAction" type="button" onClick={() => completeAdoption(draft)}>입양완료 처리</button>} />
   if (modal.type === 'new-puppy') return <EditForm draft={draft} setDraft={setDraft} fields={puppyFields} onSave={() => addPuppy(draft)} />
   if (modal.type === 'edit-puppy') return <EditForm draft={draft} setDraft={setDraft} fields={puppyFields} onSave={() => savePuppy(draft)} onDelete={() => deletePuppy(draft)} extra={<><button className="primaryAction" type="button" onClick={() => completePuppyAdoption(draft)}>입양완료 처리</button><button className="primaryAction" type="button" onClick={() => savePuppy({ ...draft, status: '확인필요' })}>확인필요 처리</button></>} />
-  if (modal.type === 'edit-supply') return <EditForm draft={draft} setDraft={setDraft} fields={supplyFields} onSave={() => saveSupply(draft)} />
+  if (modal.type === 'edit-supply') return <EditForm draft={draft} setDraft={setDraft} fields={supplyFields} onSave={() => saveSupply(draft)} onDelete={deleteSupply ? () => deleteSupply(draft) : null} />
   if (modal.type === 'edit-settlement') return <EditForm draft={draft} setDraft={setDraft} fields={settlementFields} onSave={() => saveSettlement(draft)} extra={<button className="primaryAction" type="button" onClick={() => setSettlementStatus(draft.id, '정산완료')}>정산완료</button>} />
   if (modal.type === 'edit-accounting') return <EditForm draft={draft} setDraft={setDraft} fields={accountingFields} onSave={() => saveAccounting(draft)} extra={<><button className="primaryAction" type="button" onClick={() => setAccountingStatus(draft.id, '처리완료')}>처리완료</button><button className="primaryAction" type="button" onClick={() => setAccountingStatus(draft.id, '확인필요')}>확인필요</button>{draft.settlementStatus !== '-' && <button className="primaryAction" type="button" onClick={() => setAccountingSettlement(draft.id, '정산완료')}>정산완료</button>}</>} />
   return <div className="detailGrid">{Object.entries(modal.item || {}).filter(([key]) => key !== 'id').map(([key, value]) => <div key={key}><dt>{columnLabels[key] || key}</dt><dd>{['price', 'amount', 'totalAmount', 'intakeAmount', 'adoptionPrice', 'finalPrice'].includes(key) ? currency(value) : key === 'date' || key === 'completedDate' || key === 'arrival' ? formatDateWithDay(value) : String(value)}</dd></div>)}</div>
