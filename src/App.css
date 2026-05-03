@@ -4567,3 +4567,28 @@ table.data-table td.number,
   outline-offset: 2px !important;
 }
 
+
+
+.brandLogo {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: block;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #fffaf0;
+  box-shadow: 0 3px 8px rgba(58, 38, 28, 0.16);
+}
+
+.brandSun,
+.brandMark {
+  display: none !important;
+}
+
+@media (max-width: 860px) {
+  .brandLogo {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+  }
+}

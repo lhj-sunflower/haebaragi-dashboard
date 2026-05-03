@@ -1452,7 +1452,7 @@ function AccessDenied() {
   return <section className="panel accessDenied"><h2>관리자만 접근 가능한 메뉴입니다.</h2></section>
 }
 function Brand() {
-  return <div className="brandBlock"><svg className="brandSun" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="13" /><path d="M32 4v11M32 49v11M4 32h11M49 32h11M12.2 12.2l7.8 7.8M44 44l7.8 7.8M51.8 12.2 44 20M20 44l-7.8 7.8" /></svg><div className="brandText"><strong>해바라기</strong><span>퍼피하우스</span></div></div>
+  return <div className="brandBlock"><img className="brandLogo" src="/favicon.png" alt="" aria-hidden="true" /><div className="brandText"><strong>해바라기</strong><span>퍼피하우스</span></div></div>
 }
 function staffClass(staff) {
   return staff === '예슬님' ? 'yesul' : 'director'
