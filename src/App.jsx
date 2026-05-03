@@ -9,21 +9,32 @@ const supabase = createClient(
 )
 const STORAGE_KEY = 'haebaragi-puppyhouse-final-dashboard-v3'
 const LEGACY_KEY = 'haebaragi-puppyhouse-final-dashboard-v2'
-const today = '2026-05-02'
+const today = (() => {
+  const date = new Date()
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return year + '-' + month + '-' + day
+})()
 const LOGIN_KEY = 'haebaragi-current-user'
 const AUTH_USERS = [
   { id: 'admin', name: '관리자', role: 'admin', password: '0505' },
   { id: 'user', name: '사용자', role: 'user', password: '0505' },
 ]
-const currentMonth = '2026-05'
+const currentMonth = today.slice(0, 7)
 
-const tabs = ['메인', '미용/케어', '분양관리', '매장용품관리', '고객관리', '회계/비용장부', '통합데이터']
+const tabs = ['미용케어', '입양관리', '고객관리', '용품관리', '정산관리']
 const staffList = ['원장님', '예슬님']
-const statusList = ['예약확정', '진행중', '취소']
-const paymentStatusList = ['미결제', '결제완료', '부분결제']
+const statusList = ['예약대기', '예약확정', '진행중', '진행완료', '취소']
+const paymentStatusList = ['미결제', '예약금완료', '결제완료', '환불', '해당없음']
 const itemTypes = ['사료', '간식', '패드', '목욕용품', '기타']
-const serviceTypes = ['미용', '목욕', '위생케어', '스파', '기타']
-const additionalOptions = ['없음', '가위컷', '스파', '약용샴푸', '발톱정리', '귀청소', '항문낭', '사진촬영', '기타']
+const supplyPaymentMethods = ['현금', '카드', '계좌이체', '기타']
+const timeOptions = Array.from({ length: ((20 - 9) * 60 + 50) / 10 + 1 }, (_, index) => {
+  const total = 9 * 60 + index * 10
+  return String(Math.floor(total / 60)).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0')
+})
+const serviceTypes = ['전체미용', '부분미용', '목욕', '위생케어', '기타']
+const additionalOptions = ['가위컷', '스포팅', '얼굴컷', '클리핑', '기타']
 const genderOptions = ['남아', '여아']
 const visitPathOptions = ['네이버 검색', '네이버 플레이스', '인스타그램', '지인추천', '매장 지나가다', '기존고객 소개', '전단/현수막', '기타']
 const puppyStatusList = ['입소', '상담중', '예약중', '계약진행', '입양완료', '보류', '치료중']
@@ -39,10 +50,12 @@ const SUPABASE_TABLES = {
   supplyPurchases: 'supply_purchases',
   accountingEntries: 'accounting_entries',
   settlementEntries: 'settlement_entries',
+  supplyVendors: 'supply_vendors',
 }
-const SUPABASE_DATA_KEYS = ['groomingReservations', 'adoptionConsultations', 'puppies', 'supplyPurchases', 'accountingEntries', 'settlementEntries']
+const SUPABASE_DATA_KEYS = ['groomingReservations', 'adoptionConsultations', 'puppies', 'supplyPurchases', 'supplyVendors', 'accountingEntries', 'settlementEntries']
 
 const seedData = {
+  supplyVendors: [],
   groomingReservations: [
     { id: 'g-1', date: today, time: '09:30', staff: '원장님', dogName: '콩이', breed: '시츄', guardianName: '김민지', phone: '010-1234-1001', serviceType: '위생케어', options: '기타', status: '예약확정', paymentStatus: '미결제', paymentMethod: '카드', price: 65000, customerType: '기존 고객', memo: '겁이 많아서 천천히 진행' },
     { id: 'g-2', date: today, time: '11:00', staff: '예슬님', dogName: '해피', breed: '시츄', guardianName: '박지훈', phone: '010-1234-1002', serviceType: '미용', options: '사진촬영', status: '완료', paymentStatus: '결제완료', paymentMethod: '카드', price: 80000, customerType: '기존 고객', memo: '예슬님 정산 대상' },
@@ -87,6 +100,15 @@ function formatPhoneNumber(value) {
 function formatPhone(value) {
   return formatPhoneNumber(value)
 }
+function normalizePaymentMethod(value) {
+  const text = String(value || '').trim().toLowerCase()
+  if (!text) return '기타'
+  if (['현금', 'cash'].includes(text)) return '현금'
+  if (['카드', 'card', 'credit', 'credit card', '체크카드'].includes(text)) return '카드'
+  if (['계좌이체', '계좌', 'transfer', 'bank', 'bank transfer', '이체'].includes(text)) return '계좌이체'
+  if (supplyPaymentMethods.includes(String(value).trim())) return String(value).trim()
+  return '기타'
+}
 function isPhoneField(key, label) {
   const field = String(key || '')
   const text = String(label || '')
@@ -110,8 +132,10 @@ function appendMemo(memo, note) {
 function normalizeGroomingStatus(value) {
   const status = String(value || '').trim()
   if (status === '취소') return '취소'
-  if (status === '진행중' || status === '완료' || status === '결제완료') return '진행중'
-  return '예약확정'
+  if (status === '예약확정' || status === '방문예정') return '예약확정'
+  if (status === '진행중') return '진행중'
+  if (status === '진행완료' || status === '완료' || status === '결제완료') return '진행완료'
+  return '예약대기'
 }
 function isCanceledGrooming(item) {
   return normalizeGroomingStatus(item?.status) === '취소'
@@ -124,6 +148,26 @@ function samePhone(left, right) {
 function missingText(value, fallback = '-') {
   const text = String(value ?? '').trim()
   return text || fallback
+}
+function normalizeServiceType(value) {
+  const text = String(value ?? '').trim()
+  return serviceTypes.includes(text) ? text : '기타'
+}
+function normalizeAdditionalOptions(value) {
+  const text = Array.isArray(value) ? value.join(', ') : String(value ?? '').trim()
+  return additionalOptions.includes(text) ? text : '기타'
+}
+function splitAdditionalOptions(value) {
+  return normalizeAdditionalOptions(value).split(', ').filter(Boolean)
+}
+function calculateAgeMonths(birth) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(birth || ''))) return ''
+  const born = new Date(String(birth) + 'T00:00:00')
+  const now = new Date(today + 'T00:00:00')
+  if (Number.isNaN(born.getTime()) || born > now) return ''
+  let months = (now.getFullYear() - born.getFullYear()) * 12 + now.getMonth() - born.getMonth()
+  if (now.getDate() < born.getDate()) months -= 1
+  return months >= 0 ? months + '개월' : ''
 }
 function formatHistoryDate(value) {
   return value ? formatDateWithDay(value) : '날짜 미등록'
@@ -142,30 +186,54 @@ function toGrooming(item) {
     breed: item.breed || '시츄',
     guardianName: item.guardianName || item.guardian || '',
     phone: formatPhoneNumber(item.phone || item.ownerPhone || item.guardianPhone || ''),
-    serviceType: serviceTypes.includes(item.serviceType) ? item.serviceType : (item.serviceType || item.service || '미용'),
-    options: additionalOptions.includes(item.options) ? item.options : (item.options || '없음'),
+    serviceType: normalizeServiceType(item.serviceType || item.service),
+    options: normalizeAdditionalOptions(item.options),
     status: normalizeGroomingStatus(status),
     paymentStatus: item.paymentStatus || (item.status === '결제완료' ? '결제완료' : '미결제'),
-    paymentMethod: item.paymentMethod || item.payment || '카드',
-    price: Number(item.price || 0),
+    paymentMethod: normalizePaymentMethod(item.paymentMethod || item.payment || '카드'),
+    price: moneyNumber(item.price),
     customerType: item.customerType || '기존 고객',
     memo: item.memo || '',
   }
 }
+function normalizeAdoptionStatus(value) {
+  const status = String(value || '').trim()
+  if (status === '분양완료') return '입양완료'
+  if (status === '입양확정') return '입양완료'
+  if (status === '계약진행') return '상담중'
+  if (['신규상담', '상담중', '방문예약', '상담완료', '입양완료', '보류', '취소'].includes(status)) return status
+  if (status === '확인필요') return '상담중'
+  return '신규상담'
+}
 function toAdoption(item) {
-  const status = isRemovedContactStatus(item.status) ? '상담중' : item.status
   return {
     id: item.id || `a-${Date.now()}`,
     date: item.date || today,
-    dogName: item.dogName || item.dog || item.name || '',
-    breed: item.breed || '시츄',
+    dogName: item.dogName || item.dog || item.name || item.preferredBreed || '',
+    breed: item.breed || item.preferredBreed || '시츄',
     guardianName: item.guardianName || item.guardian || '',
     phone: formatPhoneNumber(item.phone || item.ownerPhone || item.guardianPhone || ''),
+    puppyId: item.puppyId || '',
+    profileNo: item.profileNo || '',
+    gender: item.gender || '',
+    ageMonths: calculateAgeMonths(item.birth) || item.ageMonths || '',
+    arrival: item.arrival || '',
+    adoptionDate: item.adoptionDate || item.completedDate || '',
+    intakeAmount: moneyNumber(item.intakeAmount ?? item.purchasePrice ?? item.purchaseAmount),
+    adopterMemo: item.adopterMemo || '',
+    region: item.region || '',
+    preferredBreed: item.preferredBreed || item.breed || '',
+    preferredGender: item.preferredGender || '',
+    budget: moneyNumber(item.budget),
+    visitDate: item.visitDate || '',
+    route: item.route || item.visitPath || '',
+    contractProgress: item.contractProgress || '미진행',
     consultant: replaceRole(item.consultant || item.counselor || '퍼피 컨설턴트'),
-    status: status === ('분양' + '완료') ? '입양완료' : (status || '상담중'),
-        price: Number(item.price || 0),
-    paymentMethod: item.paymentMethod || '계좌이체',
+    status: normalizeAdoptionStatus(item.status),
+    price: moneyNumber(item.price || item.adoptionPrice || item.finalPrice),
+    paymentMethod: normalizePaymentMethod(item.paymentMethod || '계좌이체'),
     memo: item.memo || '',
+    specialNote: item.specialNote || '',
   }
 }
 function toPuppy(item) {
@@ -176,12 +244,12 @@ function toPuppy(item) {
     breed: item.breed || '시츄',
     gender: item.gender || '',
     birth: item.birth || '',
-    ageMonths: item.ageMonths || item.age || '',
+    ageMonths: calculateAgeMonths(item.birth) || item.ageMonths || item.age || '',
     coatColor: item.coatColor || '',
     arrival: item.arrival || item.inDate || '',
     source: item.source || '',
-    intakeAmount: Number(item.intakeAmount || 0),
-    adoptionPrice: Number(item.adoptionPrice || item.finalPrice || item.price || 0),
+    intakeAmount: moneyNumber(item.intakeAmount),
+    adoptionPrice: moneyNumber(item.adoptionPrice || item.finalPrice || item.price),
     status: item.status === ('분양' + '완료') ? '입양완료' : (item.status || '입소'),
     healthStatus: item.healthStatus || '',
     vaccination: item.vaccination || '',
@@ -196,8 +264,21 @@ function toPuppy(item) {
 function isAdoptedPuppy(puppy) {
   return ['입양완료', '분양완료'].includes(puppy?.status)
 }
+function isCompletedAdoptionStatus(status) {
+  return ['입양확정', '입양완료', '상담완료', '보류'].includes(String(status || '').trim())
+}
+function matchingActivityDate(row) {
+  return row?.adoptionDate || row?.completedDate || row?.date || ''
+}
+function isActiveMatchingRow(row) {
+  return matchingActivityDate(row) === today && row?.status !== '취소'
+}
 function activePuppyRows(puppies) {
   return puppies.filter((puppy) => !isAdoptedPuppy(puppy))
+}
+function adoptionDisplayRow(item) {
+  const { preferredBreed, preferredGender, budget, visitDate, route, contractProgress, memo, ...rest } = item || {}
+  return { ...rest, specialNote: rest.specialNote || memo || '' }
 }
 function adoptionFromPuppy(puppy) {
   return toAdoption({
@@ -221,11 +302,22 @@ function toSupply(item) {
     vendor: item.vendor || '',
     itemType: item.itemType || item.type || '사료',
     summary: item.summary || '',
-    totalAmount: Number(item.totalAmount ?? item.amount ?? 0),
-    paymentMethod: item.paymentMethod || item.payment || '카드',
+    totalAmount: moneyNumber(item.totalAmount ?? item.amount),
+    paymentMethod: normalizePaymentMethod(item.paymentMethod || item.payment || '카드'),
     status: item.status || '처리완료',
     receiptAttached: Boolean(item.receiptAttached),
     receiptName: item.receiptName || '',
+    memo: item.memo || '',
+  }
+}
+function toSupplyVendor(item) {
+  return {
+    id: item.id || 'vendor-' + Date.now(),
+    name: item.name || item.vendor || '',
+    manager: item.manager || '',
+    phone: formatPhoneNumber(item.phone || item.contact || ''),
+    mainItem: item.mainItem || item.itemType || '사료',
+    paymentMethod: normalizePaymentMethod(item.paymentMethod || '계좌이체'),
     memo: item.memo || '',
   }
 }
@@ -240,8 +332,8 @@ function toAccounting(item) {
     dogName: item.dogName || item.dog || '',
     guardianName: item.guardianName || item.guardian || '',
     staff: replaceRole(item.staff) || '공통',
-    amount: Number(item.amount || 0),
-    paymentMethod: item.paymentMethod || item.payment || '카드',
+    amount: moneyNumber(item.amount),
+    paymentMethod: normalizePaymentMethod(item.paymentMethod || item.payment || '카드'),
     status: item.status || '처리완료',
     settlementStatus: item.settlementStatus || '-',
     receiptAttached: Boolean(item.receiptAttached),
@@ -262,7 +354,7 @@ function accountingFromGrooming(item) {
     dogName: item.dogName,
     guardianName: item.guardianName,
     staff: item.staff,
-    amount: Number(item.price || 0),
+    amount: moneyNumber(item.price),
     paymentMethod: item.paymentMethod,
     status: '처리완료',
     settlementStatus: item.staff === '예슬님' ? '미정산' : '-',
@@ -284,7 +376,7 @@ function accountingFromAdoption(item) {
     dogName: item.dogName,
     guardianName: item.guardianName,
     staff: item.consultant,
-    amount: Number(item.price || 0),
+    amount: moneyNumber(item.price),
     paymentMethod: item.paymentMethod,
     status: '처리완료',
     settlementStatus: '-',
@@ -306,7 +398,7 @@ function accountingFromSupply(item) {
     dogName: '',
     guardianName: '',
     staff: '공통',
-    amount: Number(item.totalAmount || 0),
+    amount: moneyNumber(item.totalAmount),
     paymentMethod: item.paymentMethod,
     status: item.status || '처리완료',
     settlementStatus: '-',
@@ -325,8 +417,8 @@ function settlementFromGrooming(item, previous) {
     groomingId: item.id,
     dogName: item.dogName,
     guardianName: item.guardianName,
-    salesAmount: Number(item.price || 0),
-    settlementAmount: Math.round(Number(item.price || 0) * 0.6),
+    salesAmount: moneyNumber(item.price),
+    settlementAmount: Math.round(moneyNumber(item.price) * 0.6),
     status: old?.status || '미정산',
     memo: old?.memo || '',
   }
@@ -341,7 +433,13 @@ async function readSupabaseCollection(key) {
   const table = SUPABASE_TABLES[key]
   if (!table) return []
   const { data: rows, error } = await supabase.from(table).select('id,data').order('updated_at', { ascending: false })
-  if (error) throw error
+  if (error) {
+    if (key === 'supplyVendors') {
+      console.warn('supply_vendors 테이블을 찾을 수 없어 localStorage 백업을 사용합니다.', error)
+      return []
+    }
+    throw error
+  }
   return (rows || []).map((row) => ({ id: row.id, ...(row.data || {}) }))
 }
 async function loadSupabaseDashboardData() {
@@ -361,10 +459,19 @@ async function syncSupabaseCollection(key, rows) {
   const localIds = new Set(localRows.map((row) => row.id))
   if (localRows.length > 0) {
     const { error } = await supabase.from(table).upsert(localRows, { onConflict: 'id' })
-    if (error) throw error
+    if (error) {
+      if (key === 'supplyVendors') {
+        console.warn('거래처 Supabase 저장 실패, localStorage 백업을 유지합니다.', error)
+        return
+      }
+      throw error
+    }
   }
   const { data: remoteRows, error: selectError } = await supabase.from(table).select('id')
-  if (selectError) throw selectError
+  if (selectError) {
+    if (key === 'supplyVendors') return
+    throw selectError
+  }
   const deleteIds = (remoteRows || []).map((row) => String(row.id)).filter((id) => !localIds.has(id))
   if (deleteIds.length > 0) {
     const { error: deleteError } = await supabase.from(table).delete().in('id', deleteIds)
@@ -378,6 +485,8 @@ async function syncDashboardToSupabase(data, customers) {
   ])
 }
 function syncDerivedData(data) {
+  const withDefaults = { ...data, supplyVendors: data.supplyVendors || [] }
+  data = withDefaults
   const manualEntries = data.accountingEntries.filter((entry) => !['grooming', 'adoption', 'supply'].includes(entry.sourceKind))
   const groomingEntries = data.groomingReservations.filter((item) => item.paymentStatus === '결제완료').map(accountingFromGrooming)
   const adoptionEntries = data.adoptionConsultations.filter((item) => item.status === '입양완료').map(accountingFromAdoption)
@@ -392,6 +501,7 @@ function normalizeData(raw) {
     adoptionConsultations: (legacy.adoptionConsultations || legacy.adoptions || seedData.adoptionConsultations).map(toAdoption),
     puppies: legacy.puppies || seedData.puppies,
     supplyPurchases: (legacy.supplyPurchases || legacy.supplies || seedData.supplyPurchases).map(toSupply),
+    supplyVendors: (legacy.supplyVendors || legacy.suppliers || seedData.supplyVendors || []).map(toSupplyVendor),
     accountingEntries: (legacy.accountingEntries || legacy.ledger || seedData.accountingEntries).map(toAccounting),
     settlementEntries: legacy.settlementEntries || seedData.settlementEntries,
   }
@@ -429,19 +539,34 @@ function isAdmin(user) {
   return user?.role === 'admin'
 }
 function isRestrictedTab(tab) {
-  return ['회계/비용장부', '통합데이터'].includes(tab)
+  return ['정산관리', '통합데이터'].includes(tab)
+}
+function formatCurrency(value) {
+  if (value === undefined || value === null || value === '') return ''
+  const cleaned = String(value).replace(/[^0-9.-]/g, '')
+  if (cleaned === '' || cleaned === '-' || Number.isNaN(Number(cleaned))) return ''
+  return Number(cleaned).toLocaleString('ko-KR')
+}
+function moneyNumber(value) {
+  if (value === undefined || value === null || value === '') return 0
+  const cleaned = String(value).replace(/[^0-9.-]/g, '')
+  return cleaned === '' || Number.isNaN(Number(cleaned)) ? 0 : Number(cleaned)
 }
 function currency(value) {
-  return `${Number(value || 0).toLocaleString('ko-KR')}원`
+  const formatted = formatCurrency(value)
+  return formatted === '' ? '-' : `${formatted}원`
 }
 function petLabel(item) {
   return `${item.dogName || item.name || item.title} (${item.guardianName || '보호자 미정'})`
 }
 function defaultGroomingForm() {
-  return { date: today, time: '18:00', staff: '원장님', dogName: '', breed: '시츄', gender: '남아', ageMonths: '3개월', guardianName: '', phone: '', serviceType: '미용', options: '없음', status: '예약확정', paymentStatus: '미결제', paymentMethod: '카드', price: 0, customerType: '신규 고객', memo: '', visitPath: '네이버 검색' }
+  return { date: today, time: '18:00', staff: '원장님', dogName: '', breed: '시츄', gender: '남아', ageMonths: '3개월', guardianName: '', phone: '', serviceType: '전체미용', options: '가위컷', status: '예약대기', paymentStatus: '미결제', paymentMethod: '카드', price: 0, customerType: '신규 고객', memo: '', visitPath: '네이버 검색' }
 }
 function defaultSupplyForm() {
   return { date: today, vendor: '', itemType: '사료', summary: '', totalAmount: 0, paymentMethod: '카드', status: '처리완료', receiptAttached: false, receiptName: '', memo: '' }
+}
+function defaultSupplyVendor() {
+  return { id: 'vendor-' + Date.now(), name: '', manager: '', phone: '', mainItem: '사료', paymentMethod: '계좌이체', memo: '' }
 }
 function defaultAccountingForm() {
   return { date: today, type: '수익', category: '직접입력', title: '', customerVendor: '', dogName: '', guardianName: '', staff: '공통', amount: 0, paymentMethod: '카드', status: '처리완료', settlementStatus: '-', receiptAttached: false, receiptName: '', memo: '', sourceKind: 'manual', sourceId: '' }
@@ -579,11 +704,12 @@ function downloadXlsx(rows, columns, filename) {
 }
 function buildStatsRows(data) {
   const rows = []
-  data.groomingReservations.forEach((item) => rows.push({ id: 'stat-g-' + item.id, date: item.date, category: '미용', dogName: item.dogName, breed: item.breed, guardianName: item.guardianName, phone: formatPhoneNumber(item.phone), staff: item.staff, content: [item.serviceType, item.options].filter(Boolean).join(' / '), status: [item.status, item.paymentStatus].filter(Boolean).join(' / '), amount: Number(item.price || 0), memo: item.memo || '' }))
-  data.adoptionConsultations.forEach((item) => rows.push({ id: 'stat-a-' + item.id, date: item.date, category: item.status === '입양완료' ? '입양' : '상담', dogName: item.dogName, breed: item.breed, guardianName: item.guardianName, phone: formatPhoneNumber(item.phone), staff: replaceRole(item.consultant), content: '퍼피 매칭관리', status: item.status, amount: Number(item.price || 0), memo: item.memo || '' }))
-  data.puppies.forEach((item) => rows.push({ id: 'stat-p-' + item.id, date: item.completedDate || item.arrival || today, category: item.status === '입양완료' ? '입양 관리' : '퍼피 프로파일', dogName: item.name || item.dogName, breed: item.breed, guardianName: item.guardianName, phone: formatPhoneNumber(item.phone), staff: replaceRole(item.consultant), content: item.profileNo || '퍼피 프로파일', status: item.status, amount: Number(item.adoptionPrice || item.finalPrice || item.intakeAmount || 0), memo: item.memo || '' }))
+  data.groomingReservations.forEach((item) => rows.push({ id: 'stat-g-' + item.id, date: item.date, category: '미용', dogName: item.dogName, breed: item.breed, guardianName: item.guardianName, phone: formatPhoneNumber(item.phone), staff: item.staff, content: [item.serviceType, item.options].filter(Boolean).join(' / '), status: [item.status, item.paymentStatus].filter(Boolean).join(' / '), amount: moneyNumber(item.price), memo: item.memo || '' }))
+  data.adoptionConsultations.forEach((item) => rows.push({ id: 'stat-a-' + item.id, date: item.date, category: item.status === '입양완료' ? '입양' : '상담', dogName: item.dogName, breed: item.breed, guardianName: item.guardianName, phone: formatPhoneNumber(item.phone), staff: replaceRole(item.consultant), content: '퍼피 매칭관리', status: item.status, amount: moneyNumber(item.price), memo: item.memo || '' }))
+  data.puppies.forEach((item) => rows.push({ id: 'stat-p-' + item.id, date: item.completedDate || item.arrival || today, category: item.status === '입양완료' ? '입양 관리' : '퍼피 프로파일', dogName: item.name || item.dogName, breed: item.breed, guardianName: item.guardianName, phone: formatPhoneNumber(item.phone), staff: replaceRole(item.consultant), content: item.profileNo || '퍼피 프로파일', status: item.status, amount: moneyNumber(item.adoptionPrice || item.finalPrice || item.intakeAmount), memo: item.memo || '' }))
+  ;(data.supplyVendors || []).forEach((item) => rows.push({ id: 'stat-vendor-' + item.id, date: '', category: '거래처', dogName: '', breed: '', guardianName: item.name, phone: formatPhoneNumber(item.phone), staff: item.manager || '-', content: [item.mainItem, item.paymentMethod].filter(Boolean).join(' / '), status: '등록', amount: 0, memo: item.memo || '' }))
   data.supplyPurchases.forEach((item) => rows.push({ id: 'stat-s-' + item.id, date: item.date, category: '매입', dogName: '', breed: '', guardianName: item.vendor, phone: '', staff: '매장', content: [item.itemType, item.summary].filter(Boolean).join(' / '), status: item.status, amount: Number(item.totalAmount || 0), memo: item.memo || '' }))
-  data.accountingEntries.forEach((item) => rows.push({ id: 'stat-acc-' + item.id, date: item.date, category: item.type || '회계', dogName: item.dogName, breed: '', guardianName: item.guardianName || item.customerVendor, phone: formatPhoneNumber(item.phone || item.ownerPhone || item.guardianPhone || ''), staff: item.staff, content: item.title, status: item.status, amount: Number(item.amount || 0), memo: item.memo || '' }))
+  data.accountingEntries.forEach((item) => rows.push({ id: 'stat-acc-' + item.id, date: item.date, category: item.type || '회계', dogName: item.dogName, breed: '', guardianName: item.guardianName || item.customerVendor, phone: formatPhoneNumber(item.phone || item.ownerPhone || item.guardianPhone || ''), staff: item.staff, content: item.title, status: item.status, amount: moneyNumber(item.amount), memo: item.memo || '' }))
   return rows.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
 }
 function todayStamp() { return today.replaceAll('-', '') }
@@ -614,7 +740,7 @@ function buildCustomers(data) {
     current.grooming += patch.grooming || 0
     current.adoption += patch.adoption || 0
     current.visitCount += patch.visitCount || 0
-    current.totalPaid += Number(patch.totalPaid || 0)
+    current.totalPaid += moneyNumber(patch.totalPaid)
     if (patch.date && (!current.lastVisitDate || patch.date > current.lastVisitDate)) current.lastVisitDate = patch.date
     map.set(phone, current)
   }
@@ -684,7 +810,7 @@ function formatServiceHistoryDate(value) {
 }
 function serviceHistoryAmount(value) {
   if (value === undefined || value === null || value === '') return ''
-  const amount = Number(value)
+  const amount = moneyNumber(value)
   return Number.isFinite(amount) ? amount : ''
 }
 function formatServiceHistoryAmount(value) {
@@ -755,7 +881,7 @@ function buildCustomerServiceHistory(data, customerOrPhone) {
     const groomingSource = Array.isArray(data?.groomingReservations) ? data.groomingReservations : []
     const adoptionSource = Array.isArray(data?.adoptionConsultations) ? data.adoptionConsultations : []
     const puppySource = Array.isArray(data?.puppies) ? data.puppies : []
-    const accountingSource = Array.isArray(data?.accountingEntries) ? data.accountingEntries : []
+    const accountingSource = (Array.isArray(data?.accountingEntries) ? data.accountingEntries : []).filter((item) => !['grooming', 'adoption'].includes(item.sourceKind) && item.category !== '미용매출')
     const pushSafe = (sourceRows, mapper) => {
       sourceRows.forEach((item) => {
         try {
@@ -825,19 +951,19 @@ function buildCustomerServiceHistory(data, customerOrPhone) {
   return { rows: sortServiceHistory(rows.map(normalizeServiceHistoryRow)), hasError }
 }
 function sumAmount(rows, filter) {
-  return rows.filter(filter).reduce((sum, item) => sum + Number(item.amount || 0), 0)
+  return rows.filter(filter).reduce((sum, item) => sum + moneyNumber(item.amount), 0)
 }
 function sumSettlement(rows, filter, key = 'settlementAmount') {
-  return rows.filter(filter).reduce((sum, item) => sum + Number(item[key] || 0), 0)
+  return rows.filter(filter).reduce((sum, item) => sum + moneyNumber(item[key]), 0)
 }
 function App() {
-  const [activeTab, setActiveTab] = useState('메인')
+  const [activeTab, setActiveTab] = useState('미용케어')
   const [loginUser, setLoginUser] = useState(loadLoginUser)
   const [data, setData] = useState(loadData)
   const [modal, setModal] = useState(null)
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [adoptionMenu, setAdoptionMenu] = useState(adoptionMenus[0])
-  const [groomingFilters, setGroomingFilters] = useState({ staff: '전체', status: '전체', from: '2026-05-01', to: '2026-05-31', query: '' })
+  const [groomingFilters, setGroomingFilters] = useState({ staff: '전체', status: '전체', from: currentMonth + '-01', to: currentMonth + '-31', query: '' })
   const [customerPhone, setCustomerPhone] = useState('010-1234-1001')
   const [customerFilter, setCustomerFilter] = useState('전체')
   const [customerQuery, setCustomerQuery] = useState('')
@@ -846,10 +972,14 @@ function App() {
   const [groomingForm, setGroomingForm] = useState(defaultGroomingForm)
   const [supplyForm, setSupplyForm] = useState(defaultSupplyForm)
   const [accountingForm, setAccountingForm] = useState(defaultAccountingForm)
-  const [settlementFilters, setSettlementFilters] = useState({ from: '2026-05-01', to: '2026-05-31', unpaidOnly: false })
+  const [settlementFilters, setSettlementFilters] = useState({ from: currentMonth + '-01', to: currentMonth + '-31', unpaidOnly: false })
   const [accountingTab, setAccountingTab] = useState(accountingTabs[0])
   const [supabaseLoaded, setSupabaseLoaded] = useState(false)
   const visibleTabs = useMemo(() => isAdmin(loginUser) ? tabs : tabs.filter((tab) => !isRestrictedTab(tab)), [loginUser])
+
+  useEffect(() => {
+    if (!tabs.includes(activeTab) && activeTab !== '통합데이터') setActiveTab('미용케어')
+  }, [activeTab])
 
   useEffect(() => {
     let mounted = true
@@ -887,6 +1017,7 @@ function App() {
     localStorage.setItem('adoptionConsultations', JSON.stringify(data.adoptionConsultations))
     localStorage.setItem('puppies', JSON.stringify(data.puppies))
     localStorage.setItem('supplyPurchases', JSON.stringify(data.supplyPurchases))
+    localStorage.setItem('supplyVendors', JSON.stringify(data.supplyVendors || []))
     localStorage.setItem('accountingEntries', JSON.stringify(data.accountingEntries))
     localStorage.setItem('settlementEntries', JSON.stringify(data.settlementEntries))
   }, [data])
@@ -959,7 +1090,11 @@ function App() {
     setModal(null)
   }
   function deleteGrooming(id) {
-    if (!window.confirm('이 예약을 삭제하시겠습니까?')) return
+    if (!isAdmin(loginUser)) {
+      window.alert('삭제는 관리자만 가능합니다.')
+      return
+    }
+    if (!window.confirm('정말 삭제하시겠습니까?')) return
     commit((prev) => ({ ...prev, groomingReservations: prev.groomingReservations.filter((item) => item.id !== id) }))
     setModal(null)
   }
@@ -972,6 +1107,26 @@ function App() {
   function saveSupply(next) {
     const normalized = toSupply(next)
     commit((prev) => ({ ...prev, supplyPurchases: prev.supplyPurchases.map((item) => item.id === normalized.id ? normalized : item) }))
+    setModal(null)
+  }
+  function addSupplyVendor(next) {
+    const normalized = toSupplyVendor({ ...next, id: next.id || 'vendor-' + Date.now() })
+    commit((prev) => ({ ...prev, supplyVendors: [normalized, ...(prev.supplyVendors || [])] }))
+    setModal(null)
+  }
+  function saveSupplyVendor(next) {
+    const normalized = toSupplyVendor(next)
+    commit((prev) => ({ ...prev, supplyVendors: (prev.supplyVendors || []).map((item) => item.id === normalized.id ? normalized : item) }))
+    setModal(null)
+  }
+  function deleteSupplyVendor(itemOrId) {
+    if (!isAdmin(loginUser)) {
+      window.alert('삭제는 관리자만 가능합니다.')
+      return
+    }
+    const id = typeof itemOrId === 'object' ? itemOrId.id : itemOrId
+    if (!window.confirm('정말 삭제하시겠습니까?')) return
+    commit((prev) => ({ ...prev, supplyVendors: (prev.supplyVendors || []).filter((item) => item.id !== id) }))
     setModal(null)
   }
   function deleteSupply(itemOrId) {
@@ -1003,14 +1158,63 @@ function App() {
     commit((prev) => ({ ...prev, accountingEntries: prev.accountingEntries.map((item) => item.id === id ? { ...item, settlementStatus: status } : item), settlementEntries: prev.settlementEntries.map((item) => `acc-grooming-${item.groomingId}` === id ? { ...item, status } : item) }))
     setModal(null)
   }
+  function finalizeAdoptionWithPuppy(prev, normalized) {
+    if (!['입양완료', '입양확정'].includes(normalized.status)) return prev
+    const targetId = normalized.puppyId
+    if (!targetId) return prev
+    const completedDate = normalized.adoptionDate || normalized.completedDate || today
+    return {
+      ...prev,
+      puppies: prev.puppies.map((puppy) => puppy.id === targetId ? toPuppy({
+        ...puppy,
+        status: '입양완료',
+        completedDate,
+        guardianName: normalized.guardianName,
+        phone: normalized.phone,
+        consultant: normalized.consultant,
+        adoptionPrice: normalized.price || puppy.adoptionPrice,
+        memo: normalized.memo || puppy.memo,
+      }) : puppy),
+    }
+  }
+  function addAdoption(next = {}) {
+    const normalized = toAdoption({ ...next, id: next.id || 'a-' + Date.now() })
+    commit((prev) => {
+      const duplicate = normalized.status === '입양완료' && normalized.puppyId ? prev.adoptionConsultations.find((item) => item.puppyId === normalized.puppyId) : null
+      const row = duplicate ? { ...normalized, id: duplicate.id } : normalized
+      const adoptionConsultations = duplicate ? prev.adoptionConsultations.map((item) => item.id === duplicate.id ? row : item) : [row, ...prev.adoptionConsultations]
+      return finalizeAdoptionWithPuppy({ ...prev, adoptionConsultations }, row)
+    })
+    setModal(null)
+  }
   function completeAdoption(item) {
-    const completed = { ...toAdoption(item), status: '입양완료' }
-    commit((prev) => ({ ...prev, adoptionConsultations: prev.adoptionConsultations.map((adoption) => adoption.id === completed.id ? completed : adoption) }))
+    const completed = { ...toAdoption(item), status: '입양완료', adoptionDate: item.adoptionDate || today }
+    commit((prev) => {
+      const base = { ...prev, adoptionConsultations: prev.adoptionConsultations.map((adoption) => adoption.id === completed.id ? completed : adoption) }
+      return finalizeAdoptionWithPuppy(base, completed)
+    })
     setModal({ type: 'edit-adoption', title: '입양완료 처리', item: completed })
   }
   function saveAdoption(next) {
     const normalized = toAdoption(next)
-    commit((prev) => ({ ...prev, adoptionConsultations: prev.adoptionConsultations.map((item) => item.id === normalized.id ? normalized : item) }))
+    commit((prev) => {
+      const exists = prev.adoptionConsultations.some((item) => item.id === normalized.id)
+      const adoptionConsultations = exists ? prev.adoptionConsultations.map((item) => item.id === normalized.id ? normalized : item) : [normalized, ...prev.adoptionConsultations]
+      return finalizeAdoptionWithPuppy({ ...prev, adoptionConsultations }, normalized)
+    })
+    setModal(null)
+  }
+  function deleteAdoptionHistory(item) {
+    if (!isAdmin(loginUser)) {
+      window.alert('삭제는 관리자만 가능합니다.')
+      return
+    }
+    if (!window.confirm('해당 입양 관리 내역을 삭제하시겠습니까?')) return
+    commit((prev) => {
+      if (item.sourceKind === 'adoption') return { ...prev, adoptionConsultations: prev.adoptionConsultations.filter((row) => row.id !== item.sourceId) }
+      if (item.sourceKind === 'puppy') return { ...prev, puppies: prev.puppies.filter((row) => row.id !== item.sourceId) }
+      return prev
+    })
     setModal(null)
   }
   function deleteAdoption(item) {
@@ -1053,7 +1257,7 @@ function App() {
     savePuppy(normalized)
   }
   function saveSettlement(next) {
-    commit((prev) => ({ ...prev, settlementEntries: prev.settlementEntries.map((item) => item.id === next.id ? { ...next, salesAmount: Number(next.salesAmount), settlementAmount: Number(next.settlementAmount) } : item) }))
+    commit((prev) => ({ ...prev, settlementEntries: prev.settlementEntries.map((item) => item.id === next.id ? { ...next, salesAmount: moneyNumber(next.salesAmount), settlementAmount: moneyNumber(next.settlementAmount) } : item) }))
     setModal(null)
   }
   function setSettlementStatus(id, status) {
@@ -1066,7 +1270,7 @@ function App() {
       return
     }
     if (!customer?.phone) return
-    if (!window.confirm('정말 삭제하시겠습니까?')) return
+    if (!window.confirm('\uD574\uB2F9 \uACE0\uAC1D \uC815\uBCF4\uB97C \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?')) return
     const phoneKey = phoneDigits(customer.phone)
     setDeletedCustomerPhones((prev) => Array.from(new Set([...prev, phoneKey])))
     setCustomerMemos((prev) => {
@@ -1086,10 +1290,33 @@ function App() {
   if (!loginUser) return <LoginScreen onLogin={setLoginUser} />
   const restricted = isRestrictedTab(activeTab) && !isAdmin(loginUser)
 
-  return <main className="appShell"><aside className="sidebar"><Brand /><nav className="tabs" aria-label="업무 탭">{visibleTabs.map((tab) => <button className={activeTab === tab ? 'active' : ''} key={tab} type="button" onClick={() => setActiveTab(tab)}>{tab}</button>)}</nav></aside><section className="page"><header className="pageHeader"><div><p className="kicker">LOCAL STORAGE · 자동 저장</p><h1>{activeTab}</h1></div><div className="headerTools"><div className="headerPill">현재 사용자: {loginUser.name}</div><button type="button" onClick={() => { localStorage.removeItem(LOGIN_KEY); setLoginUser(null) }}>로그아웃</button></div></header>{restricted && <AccessDenied />}{!restricted && activeTab === '메인' && <MainTab todayGrooming={todayGrooming} todayAdoptions={todayAdoptions} calendarOpen={calendarOpen} setCalendarOpen={setCalendarOpen} calendarDays={calendarDays} data={data} setModal={setModal} />}{!restricted && activeTab === '미용/케어' && <GroomingTab form={groomingForm} setForm={setGroomingForm} addGrooming={addGrooming} filters={groomingFilters} setFilters={setGroomingFilters} rows={filteredGrooming} setModal={setModal} customers={customers} />}{!restricted && activeTab === '분양관리' && <AdoptionTab data={data} menu={adoptionMenu} setMenu={setAdoptionMenu} setModal={setModal} completeAdoption={completeAdoption} />}{!restricted && activeTab === '매장용품관리' && <SupplyTab form={supplyForm} setForm={setSupplyForm} addSupply={addSupply} supplies={data.supplyPurchases} setModal={setModal} deleteSupply={isAdmin(loginUser) ? deleteSupply : null} />}{!restricted && activeTab === '고객관리' && <CustomerTab customers={customers} selectedCustomer={selectedCustomer} phone={customerPhone} setPhone={setCustomerPhone} history={selectedCustomerHistory} setModal={setModal} filter={customerFilter} setFilter={setCustomerFilter} query={customerQuery} setQuery={setCustomerQuery} customerMemos={customerMemos} setCustomerMemos={setCustomerMemos} deleteCustomer={isAdmin(loginUser) ? deleteCustomer : null} />}{!restricted && activeTab === '회계/비용장부' && isAdmin(loginUser) && <LedgerTab activeTab={accountingTab} setActiveTab={setAccountingTab} form={accountingForm} setForm={setAccountingForm} addAccounting={addAccounting} entries={data.accountingEntries} settlements={filteredSettlements} receipts={data.accountingEntries.filter((item) => item.receiptAttached || item.receiptName)} todayIncome={todayIncome} todayExpense={todayExpense} monthIncome={monthIncome} monthExpense={monthExpense} todayYesulSales={todayYesulSales} todayYesulSettlement={todayYesulSettlement} monthYesulSales={monthYesulSales} monthYesulSettlement={monthYesulSettlement} filters={settlementFilters} setFilters={setSettlementFilters} setModal={setModal} />}{!restricted && activeTab === '통합데이터' && isAdmin(loginUser) && <StatsTab data={data} />}</section>{modal && <Modal modal={modal} onClose={() => setModal(null)} saveGrooming={saveGrooming} saveAdoption={saveAdoption} savePuppy={savePuppy} addPuppy={addPuppy} deletePuppy={deletePuppy} completePuppyAdoption={completePuppyAdoption} saveSupply={saveSupply} saveAccounting={saveAccounting} saveSettlement={saveSettlement} completeAdoption={completeAdoption} chooseExistingCustomer={chooseExistingCustomer} createGrooming={createGrooming} setAccountingStatus={setAccountingStatus} setAccountingSettlement={setAccountingSettlement} setSettlementStatus={setSettlementStatus} deleteGrooming={deleteGrooming} deleteAdoption={deleteAdoption} deleteSupply={isAdmin(loginUser) ? deleteSupply : null} />}</main>
+  return <main className="appShell"><aside className="sidebar"><Brand /><nav className="tabs" aria-label="업무 탭">{visibleTabs.map((tab) => <button className={activeTab === tab ? 'active' : ''} key={tab} type="button" onClick={() => setActiveTab(tab)}>{tab}</button>)}</nav></aside><section className="page"><header className="pageHeader premiumHeader"><div className="pageHeading"><p className="kicker">SUNFLOWER PUPPY HOUSE</p><h1>{pageTitle(activeTab)}</h1><span>{pageSubtitle(activeTab)}</span></div><div className="headerTools"><div className="headerPill">현재 사용자: {loginUser.name}</div><button type="button" onClick={() => { localStorage.removeItem(LOGIN_KEY); setLoginUser(null) }}>로그아웃</button></div></header>{restricted && <AccessDenied />}{!restricted && activeTab === '미용케어' && <GroomingTab filters={groomingFilters} setFilters={setGroomingFilters} rows={filteredGrooming} allRows={data.groomingReservations} setModal={setModal} customers={customers} />}{!restricted && activeTab === '입양관리' && <AdoptionTab data={data} menu={adoptionMenu} setMenu={setAdoptionMenu} setModal={setModal} completeAdoption={completeAdoption} addAdoption={addAdoption} deleteAdoptionHistory={isAdmin(loginUser) ? deleteAdoptionHistory : null} />}{!restricted && activeTab === '용품관리' && <SupplyTab form={supplyForm} setForm={setSupplyForm} addSupply={addSupply} supplies={data.supplyPurchases} vendors={data.supplyVendors || []} setModal={setModal} deleteSupply={isAdmin(loginUser) ? deleteSupply : null} />}{!restricted && activeTab === '고객관리' && <CustomerTab customers={customers} selectedCustomer={selectedCustomer} phone={customerPhone} setPhone={setCustomerPhone} history={selectedCustomerHistory} setModal={setModal} filter={customerFilter} setFilter={setCustomerFilter} query={customerQuery} setQuery={setCustomerQuery} customerMemos={customerMemos} setCustomerMemos={setCustomerMemos} deleteCustomer={isAdmin(loginUser) ? deleteCustomer : null} />}{!restricted && activeTab === '정산관리' && isAdmin(loginUser) && <LedgerTab activeTab={accountingTab} setActiveTab={setAccountingTab} form={accountingForm} setForm={setAccountingForm} addAccounting={addAccounting} entries={data.accountingEntries} settlements={filteredSettlements} receipts={data.accountingEntries.filter((item) => item.receiptAttached || item.receiptName)} todayIncome={todayIncome} todayExpense={todayExpense} monthIncome={monthIncome} monthExpense={monthExpense} todayYesulSales={todayYesulSales} todayYesulSettlement={todayYesulSettlement} monthYesulSales={monthYesulSales} monthYesulSettlement={monthYesulSettlement} filters={settlementFilters} setFilters={setSettlementFilters} setModal={setModal} />}{!restricted && activeTab === '통합데이터' && isAdmin(loginUser) && <StatsTab data={data} />}</section>{modal && <Modal modal={modal} onClose={() => setModal(null)} saveGrooming={saveGrooming} saveAdoption={saveAdoption} addAdoption={addAdoption} savePuppy={savePuppy} addPuppy={addPuppy} deletePuppy={deletePuppy} completePuppyAdoption={completePuppyAdoption} saveSupply={saveSupply} saveAccounting={saveAccounting} saveSettlement={saveSettlement} completeAdoption={completeAdoption} chooseExistingCustomer={chooseExistingCustomer} createGrooming={createGrooming} setAccountingStatus={setAccountingStatus} setAccountingSettlement={setAccountingSettlement} setSettlementStatus={setSettlementStatus} deleteGrooming={isAdmin(loginUser) ? deleteGrooming : null} deleteAdoption={deleteAdoption} deleteSupply={isAdmin(loginUser) ? deleteSupply : null} addSupplyVendor={addSupplyVendor} saveSupplyVendor={saveSupplyVendor} deleteSupplyVendor={isAdmin(loginUser) ? deleteSupplyVendor : null} activePuppies={activePuppyRows(data.puppies)} />}</main>
 }
 function roleLabel(role) {
   return { admin: '관리자', user: '사용자' }[role] || role
+}
+function pageTitle(tab) {
+  return {
+    '미용케어': '케어 스케줄 라운지',
+    '입양관리': '퍼피 입양 살롱',
+    '고객관리': '고객 케어 CRM',
+    '용품관리': '샵 서플라이 아뜰리에',
+    '정산관리': '프리미엄 정산 데스크',
+    '통합데이터': '통합데이터 로그북',
+  }[tab] || tab
+}
+function pageSubtitle(tab) {
+  return {
+    '미용케어': '오늘의 케어 일정과 예약 흐름을 한눈에 정리합니다.',
+    '입양관리': '퍼피 매칭부터 입양 완료 이력까지 차분하게 관리합니다.',
+    '고객관리': '보호자와 반려견의 방문 이력을 섬세하게 이어갑니다.',
+    '용품관리': '거래처별 매입 흐름을 간결하게 확인합니다.',
+    '정산관리': '수익과 비용, 정산 내역을 관리자 기준으로 정돈합니다.',
+    '통합데이터': '미용, 입양, 고객, 회계, 매장용품 데이터를 한곳에서 확인하는 로그북입니다.',
+  }[tab] || '해바라기 퍼피하우스 업무 화면입니다.'
+}
+function statusTone(status) {
+  return { 예약대기: 'waiting', 예약확정: 'confirmed', 진행중: 'active', 진행완료: 'done', 취소: 'cancelled' }[normalizeGroomingStatus(status)] || 'waiting'
 }
 function LoginScreen({ onLogin }) {
   const [userId, setUserId] = useState('admin')
@@ -1132,28 +1359,99 @@ function PersonSchedule({ title, rows, setModal }) {
   const sortedRows = sortByDateTime(rows)
   return <article className="panel"><div className="panelTitle"><h2>{title}</h2><span>{rows.length}건</span></div><div className="miniList">{sortedRows.slice(0, 3).map((item) => <button key={item.id} type="button" onClick={() => setModal({ type: item.consultant ? 'edit-adoption' : 'edit-grooming', title: petLabel(item), item })}><strong>{petLabel(item)}</strong><span>{formatDateWithDay(item.date)} · {item.time || item.status} · {item.serviceType || item.memo}</span></button>)}{sortedRows.length > 3 && <button className="moreButton" type="button" onClick={() => setModal({ type: 'list', title, list: sortedRows })}>나머지 {sortedRows.length - 3}건 보기</button>}</div></article>
 }
-function GroomingTab({ filters, setFilters, rows, setModal, customers }) {
-  return <div className="stack"><section className="panel compactToolbar"><div><h2>미용/케어 예약</h2><p>예약등록 버튼으로 신규/기존 고객 선택 후 예약을 등록합니다.</p></div><button className="largeAction" type="button" onClick={() => setModal({ type: 'booking', title: '예약등록', customers })}>예약등록</button></section><section className="panel reservationPanel"><div className="panelTitle"><h2>예약현황</h2><span>행 클릭 시 상세/수정</span></div><div className="filterBar"><Input label="검색" value={filters.query} onChange={(value) => setFilters({ ...filters, query: value })} /><Input label="시작일" type="date" value={filters.from} onChange={(value) => setFilters({ ...filters, from: value })} /><Input label="종료일" type="date" value={filters.to} onChange={(value) => setFilters({ ...filters, to: value })} /><Select label="담당자" value={filters.staff} onChange={(value) => setFilters({ ...filters, staff: value })} options={['전체', ...staffList]} /><Select label="진행상태" value={filters.status} onChange={(value) => setFilters({ ...filters, status: value })} options={['전체', ...statusList]} /></div><DataTable rows={rows} columns={['dogName', 'breed', 'guardianName', 'phone', 'date', 'time', 'serviceType', 'options', 'price', 'staff', 'status', 'paymentStatus']} type="edit-grooming" setModal={setModal} /></section></div>
+function GroomingTab({ filters, setFilters, rows, allRows, setModal, customers }) {
+  const [view, setView] = useState('today')
+  const views = [
+    { key: 'today', label: '오늘 케어 일정' },
+    { key: 'bookings', label: '예약 관리' },
+    { key: 'calendar', label: '월간 케어 캘린더' },
+  ]
+  const activeRows = sortByDateTime((allRows || []).filter((item) => !isCanceledGrooming(item)))
+  const todayRows = activeRows.filter((item) => item.date === today)
+  const directorRows = todayRows.filter((item) => item.staff === '원장님')
+  const yesulRows = todayRows.filter((item) => item.staff === '예슬님')
+  const tableRows = rows.map((item) => ({ ...item, status: normalizeGroomingStatus(item.status) }))
+  return <div className="stack groomingWorkspace"><div className="subTabs groomingSubTabs">{views.map((item) => <button className={view === item.key ? 'active' : ''} key={item.key} type="button" onClick={() => setView(item.key)}>{item.label}</button>)}</div>{view === 'today' && <TodayCareBoard directorRows={directorRows} yesulRows={yesulRows} setModal={setModal} />}{view === 'bookings' && <><section className="panel compactToolbar groomingToolbar"><div><h2>프리미엄 케어 예약</h2><p>신규 고객 등록과 기존 고객 재예약을 한 흐름으로 관리합니다.</p></div><button className="largeAction" type="button" onClick={() => setModal({ type: 'booking', title: '예약등록', customers })}>예약등록</button></section><section className="panel reservationPanel groomingReservationPanel"><div className="panelTitle"><h2>예약 관리</h2><span>행 클릭 시 상세/수정</span></div><div className="filterBar groomingFilterBar"><Input label="검색" value={filters.query} onChange={(value) => setFilters({ ...filters, query: value })} /><Input label="시작일" type="date" value={filters.from} onChange={(value) => setFilters({ ...filters, from: value })} /><Input label="종료일" type="date" value={filters.to} onChange={(value) => setFilters({ ...filters, to: value })} /><Select label="담당자" value={filters.staff} onChange={(value) => setFilters({ ...filters, staff: value })} options={['전체', ...staffList]} /><Select label="진행상태" value={filters.status} onChange={(value) => setFilters({ ...filters, status: value })} options={['전체', ...statusList]} /></div><DataTable rows={tableRows} columns={['dogName', 'breed', 'guardianName', 'phone', 'date', 'time', 'staff', 'serviceType', 'options', 'price', 'status', 'paymentStatus']} type="edit-grooming" setModal={setModal} /></section></>}{view === 'calendar' && <CareCalendar rows={activeRows} setModal={setModal} />}</div>
+}
+function TodayCareBoard({ directorRows, yesulRows, setModal }) {
+  return <section className="careBoard"><CareStaffCard title="원장님 케어 일정" rows={directorRows} setModal={setModal} /><CareStaffCard title="예슬님 케어 일정" rows={yesulRows} setModal={setModal} /></section>
+}
+function CareStaffCard({ title, rows, setModal }) {
+  return <article className="panel careStaffCard"><div className="panelTitle"><h2>{title}</h2><span>{rows.length}건</span></div><div className="careCardList">{rows.length === 0 ? <p className="empty">오늘 남은 케어 일정이 없습니다.</p> : rows.map((item) => <CareReservationCard key={item.id} item={item} setModal={setModal} />)}</div></article>
+}
+function CareReservationCard({ item, setModal }) {
+  const status = normalizeGroomingStatus(item.status)
+  return <button className={`careReservationCard compactCareCard status-${statusTone(status)}`} type="button" onClick={() => setModal({ type: 'edit-grooming', title: petLabel(item), item: { ...item, status } })}><span className="compactCareTime">{displayValue(item, 'time')}</span><strong>{displayValue(item, 'dogName')}</strong><span>{displayValue(item, 'serviceType')}</span><span>{displayValue(item, 'options')}</span><b>{displayValue(item, 'paymentStatus')}</b><i className={`statusDot status-${statusTone(status)}`} title={status} aria-label={status} /></button>
+}
+function CareCalendar({ rows, setModal }) {
+  const days = monthDays(currentMonth, rows, [])
+  return <section className="panel careCalendarPanel"><div className="panelTitle"><h2>월간 케어 캘린더</h2><span>{currentMonth}</span></div><div className="calendarWeek"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div><div className="calendarGrid careCalendarGrid">{days.map((day) => day.blank ? <div className="calendarBlank" key={day.key} /> : <button className="calendarDay careCalendarDay" type="button" key={day.key} onClick={() => setModal({ type: 'grooming-day-list', title: formatDateWithDay(day.date) + ' 케어 예약', list: day.entries })}><strong>{day.label}</strong>{day.entries.slice(0, 4).map((item) => <span className={`careCalendarItem ${staffClass(item.staff)}`} key={item.id}>{item.time || '-'} {item.staff || '-'} {item.dogName || '-'}</span>)}{day.entries.length > 4 && <small>외 {day.entries.length - 4}건</small>}</button>)}</div></section>
 }
 function completedAdoptionRows(data) {
-  return data.puppies.filter(isAdoptedPuppy).map((puppy) => ({
-    ...puppy,
-    dogName: puppy.name || puppy.dogName || '',
-    completedDate: puppy.completedDate || today,
-    finalPrice: puppy.adoptionPrice || puppy.finalPrice || 0,
-    specialNote: puppy.specialNote || puppy.memo || '',
-  }))
+  const rows = []
+  const linkedPuppyIds = new Set()
+  ;(data.adoptionConsultations || []).forEach((item) => {
+    if (!isCompletedAdoptionStatus(item.status)) return
+    const completedDate = item.adoptionDate || item.completedDate || item.date || today
+    if (item.puppyId) linkedPuppyIds.add(item.puppyId)
+    const linkedPuppy = item.puppyId ? (data.puppies || []).find((puppy) => puppy.id === item.puppyId) : null
+    rows.push({
+      ...adoptionDisplayRow(item),
+      id: 'adoption-history-' + item.id,
+      dogName: item.dogName || item.name || item.preferredBreed || '-',
+      breed: item.breed || item.preferredBreed || '-',
+      gender: item.gender || '-',
+      ageMonths: calculateAgeMonths(item.birth) || item.ageMonths || '-',
+      arrival: item.arrival || linkedPuppy?.arrival || '-',
+      completedDate,
+      adoptionDate: completedDate,
+      intakeAmount: item.intakeAmount || item.purchasePrice || linkedPuppy?.intakeAmount || linkedPuppy?.purchasePrice || 0,
+      finalPrice: item.price || item.adoptionPrice || item.finalPrice || linkedPuppy?.adoptionPrice || 0,
+      guardianName: item.guardianName || '-',
+      phone: formatPhoneNumber(item.phone),
+      region: item.region || '-',
+      paymentMethod: normalizePaymentMethod(item.paymentMethod || '계좌이체'),
+      consultant: replaceRole(item.consultant),
+      specialNote: item.specialNote || item.memo || item.adopterMemo || '',
+      sourceKind: 'adoption',
+      sourceId: item.id,
+    })
+  })
+  ;(data.puppies || []).filter(isAdoptedPuppy).forEach((puppy) => {
+    if (linkedPuppyIds.has(puppy.id)) return
+    rows.push({
+      ...puppy,
+      dogName: puppy.name || puppy.dogName || '-',
+      completedDate: puppy.completedDate || today,
+      adoptionDate: puppy.completedDate || today,
+      intakeAmount: puppy.intakeAmount || puppy.purchasePrice || 0,
+      finalPrice: puppy.adoptionPrice || puppy.finalPrice || 0,
+      guardianName: puppy.guardianName || '-',
+      phone: formatPhoneNumber(puppy.phone),
+      region: puppy.region || '-',
+      paymentMethod: normalizePaymentMethod(puppy.paymentMethod || '계좌이체'),
+      status: puppy.status || '입양완료',
+      specialNote: puppy.specialNote || puppy.memo || '',
+      sourceKind: 'puppy',
+      sourceId: puppy.id,
+    })
+  })
+  return rows.sort((a, b) => String(b.completedDate || b.date || '').localeCompare(String(a.completedDate || a.date || '')))
 }
-function AdoptionTab({ data, menu, setMenu, setModal, completeAdoption }) {
+function AdoptionTab({ data, menu, setMenu, setModal, completeAdoption, addAdoption, deleteAdoptionHistory }) {
   const profileRows = activePuppyRows(data.puppies)
   const adoptedRows = completedAdoptionRows(data)
-  const rows = menu === adoptionMenus[0] ? data.adoptionConsultations : menu === adoptionMenus[1] ? profileRows : adoptedRows
-  const columns = menu === adoptionMenus[0] ? ['dogName', 'breed', 'guardianName', 'status', 'consultant'] : menu === adoptionMenus[1] ? ['name', 'breed', 'gender', 'ageMonths', 'arrival', 'intakeAmount', 'adoptionPrice', 'status', 'consultant'] : ['dogName', 'breed', 'gender', 'ageMonths', 'arrival', 'completedDate', 'finalPrice', 'guardianName', 'phone', 'consultant']
+  const matchingRows = sortByDateTime((data.adoptionConsultations || []).filter(isActiveMatchingRow)).map(adoptionDisplayRow)
+  const rows = menu === adoptionMenus[0] ? matchingRows : menu === adoptionMenus[1] ? profileRows : adoptedRows
+  const columns = menu === adoptionMenus[0] ? ['dogName', 'breed', 'gender', 'ageMonths', 'guardianName', 'phone', 'region', 'paymentMethod', 'price', 'adoptionDate', 'status'] : menu === adoptionMenus[1] ? ['name', 'breed', 'gender', 'ageMonths', 'arrival', 'intakeAmount', 'adoptionPrice', 'status', 'consultant'] : ['dogName', 'breed', 'gender', 'ageMonths', 'guardianName', 'phone', 'region', 'paymentMethod', 'intakeAmount', 'finalPrice', 'adoptionDate', 'status']
   const tableClass = menu === adoptionMenus[1] ? 'puppyProfilePanel' : menu === adoptionMenus[2] ? 'puppyAdoptionPanel' : ''
-  return <div className="stack"><div className="subTabs">{adoptionMenus.map((item) => <button className={menu === item ? 'active' : ''} key={item} type="button" onClick={() => setMenu(item)}>{item}</button>)}</div>{menu === adoptionMenus[1] && <section className="panel compactToolbar"><div><h2>퍼피 프로파일</h2><p>신규 등록, 수정, 삭제, 입양완료 처리를 관리합니다.</p></div><button className="largeAction" type="button" onClick={() => setModal({ type: 'new-puppy', title: '신규 퍼피 등록', item: { status: '입소', breed: '시츄', consultant: '퍼피 컨설턴트' } })}>신규 퍼피 등록</button></section>}<section className={`panel compactPanel ${tableClass}`}><div className="panelTitle"><h2>{menu}</h2><span>행 클릭 시 팝업</span></div><DataTable rows={rows} columns={columns} type={menu === adoptionMenus[0] ? 'edit-adoption' : 'edit-puppy'} setModal={setModal} extraAction={completeAdoption} /></section></div>
+  return <div className="stack"><div className="subTabs">{adoptionMenus.map((item) => <button className={menu === item ? 'active' : ''} key={item} type="button" onClick={() => setMenu(item)}>{item}</button>)}</div>{menu === adoptionMenus[0] && <section className="panel compactToolbar"><div><h2>퍼피 매칭 상담</h2><p>오늘 진행할 상담과 퍼피 프로파일 연결을 관리합니다.</p></div><button className="largeAction" type="button" onClick={() => setModal({ type: 'new-adoption', title: '퍼피 매칭 상담 등록', item: { date: today, status: '신규상담', consultant: '퍼피 컨설턴트' } })}>상담 등록</button></section>}{menu === adoptionMenus[1] && <section className="panel compactToolbar"><div><h2>퍼피 프로파일</h2><p>신규 등록, 수정, 삭제, 입양완료 처리를 관리합니다.</p></div><button className="largeAction" type="button" onClick={() => setModal({ type: 'new-puppy', title: '신규 퍼피 등록', item: { status: '입소', breed: '시츄', consultant: '퍼피 컨설턴트' } })}>신규 퍼피 등록</button></section>}<section className={`panel compactPanel ${tableClass}`}><div className="panelTitle"><h2>{menu}</h2><span>{menu === adoptionMenus[0] ? '오늘 기준 진행 상담' : '행 클릭 시 팝업'}</span></div><DataTable rows={rows} columns={columns} type={menu === adoptionMenus[0] ? 'edit-adoption' : menu === adoptionMenus[2] ? 'detail' : 'edit-puppy'} setModal={setModal} extraAction={completeAdoption} onDelete={menu === adoptionMenus[2] ? deleteAdoptionHistory : null} /></section></div>
 }
-function SupplyTab({ form, setForm, addSupply, supplies, setModal, deleteSupply }) {
-  return <div className="stack"><form className="panel formGrid" onSubmit={addSupply}><div className="panelTitle wide"><h2>거래처/대리점 총매입가 등록</h2><span>개별 상품 재고관리 없음</span></div><Input label="매입일" type="date" value={form.date} onChange={(value) => setForm({ ...form, date: value })} /><Input label="거래처" value={form.vendor} onChange={(value) => setForm({ ...form, vendor: value })} /><Select label="품목구분" value={form.itemType} onChange={(value) => setForm({ ...form, itemType: value })} options={itemTypes} /><Input label="매입내용" value={form.summary} onChange={(value) => setForm({ ...form, summary: value })} /><Input label="총매입금액" type="number" value={form.totalAmount} onChange={(value) => setForm({ ...form, totalAmount: value })} /><Input label="결제수단" value={form.paymentMethod} onChange={(value) => setForm({ ...form, paymentMethod: value })} /><Select label="처리상태" value={form.status} onChange={(value) => setForm({ ...form, status: value })} options={processStatusList} /><ReceiptInput label="영수증 첨부" onChange={(fileName) => setForm({ ...form, receiptAttached: Boolean(fileName), receiptName: fileName })} /><button className="primaryAction" type="submit">매입 등록</button></form><section className="panel"><DataTable rows={supplies} columns={['date', 'vendor', 'itemType', 'totalAmount', 'status']} type="edit-supply" setModal={setModal} onDelete={deleteSupply} /></section></div>
+function SupplyTab({ form, setForm, addSupply, supplies, vendors, setModal, deleteSupply }) {
+  const vendorNames = ['직접입력', ...vendors.map((item) => item.name).filter(Boolean)]
+  const vendorOptions = form.vendor && !vendorNames.includes(form.vendor) ? [...vendorNames, form.vendor] : vendorNames
+  const vendorRows = vendors.map((item) => ({ ...item, supplierName: item.name || item.vendor || '' }))
+  return <div className="stack supplyWorkspace"><section className="panel compactToolbar"><div><h2>거래처 관리</h2><p>등록된 거래처는 매입 등록 시 바로 선택할 수 있습니다.</p></div><button className="largeAction" type="button" onClick={() => setModal({ type: 'new-supply-vendor', title: '거래처 등록', item: defaultSupplyVendor() })}>거래처 등록</button></section><form className="panel formGrid" onSubmit={addSupply}><div className="panelTitle wide"><h2>거래처/대리점 총매입가 등록</h2><span>개별 상품 재고관리 없음</span></div><Input label="매입일" type="date" value={form.date} onChange={(value) => setForm({ ...form, date: value })} /><Select label="납품업체명" value={form.vendor || '직접입력'} onChange={(value) => setForm({ ...form, vendor: value === '직접입력' ? '' : value })} options={vendorOptions} /><Select label="품목구분" value={form.itemType} onChange={(value) => setForm({ ...form, itemType: value })} options={itemTypes} /><Input label="매입내용" value={form.summary} onChange={(value) => setForm({ ...form, summary: value })} /><Input label="총매입금액" type="number" value={form.totalAmount} onChange={(value) => setForm({ ...form, totalAmount: value })} /><Select label="결제조건" value={form.paymentMethod} onChange={(value) => setForm({ ...form, paymentMethod: value })} options={supplyPaymentMethods} /><Select label="처리상태" value={form.status} onChange={(value) => setForm({ ...form, status: value })} options={processStatusList} /><ReceiptInput label="영수증 첨부" onChange={(fileName) => setForm({ ...form, receiptAttached: Boolean(fileName), receiptName: fileName })} /><button className="primaryAction" type="submit">매입 등록</button></form><section className="panel compactPanel"><div className="panelTitle"><h2>거래처 목록</h2><span>{vendors.length}곳</span></div><DataTable rows={vendorRows} columns={['supplierName', 'manager', 'phone', 'mainItem', 'paymentMethod']} type="edit-supply-vendor" setModal={setModal} onDelete={null} /></section><section className="panel"><DataTable rows={supplies} columns={['date', 'vendor', 'itemType', 'totalAmount', 'status']} type="edit-supply" setModal={setModal} onDelete={deleteSupply} /></section></div>
 }
 function CustomerTab({ customers, selectedCustomer, phone, setPhone, history, setModal, filter, setFilter, query, setQuery, customerMemos, setCustomerMemos, deleteCustomer }) {
   const historyRows = Array.isArray(history) ? history : (history?.rows || [])
@@ -1182,13 +1480,13 @@ function CustomerTab({ customers, selectedCustomer, phone, setPhone, history, se
       <section className="panel crmCustomerList">
         <div className="panelTitle"><h2>고객 목록</h2><span>{filteredCustomers.length}명</span></div>
         <div className="crmList">{filteredCustomers.map((customer) => <div className={phone === customer.phone ? 'crmListRow selected' : 'crmListRow'} key={customer.phone}>
-          <button className="crmSelectButton" type="button" onClick={() => setPhone(customer.phone)}>
+          <div className="crmSelectButton" role="button" tabIndex={0} onClick={() => setPhone(customer.phone)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setPhone(customer.phone) }}>
+            {deleteCustomer && <button className="crmDeleteXButton" type="button" aria-label="고객 삭제" onClick={(event) => { event.stopPropagation(); deleteCustomer(customer) }}>{'\u00D7'}</button>}
             <strong>{customer.guardianName || '-'}</strong>
             <span>{formatPhoneNumber(customer.phone) || '-'}</span>
             <em>견명 {customer.dogName || '-'}</em>
             <div className="badgeRow crmBadges">{customer.badges.map((badge) => <i className={badgeClass(badge)} key={badge}>{badge}</i>)}</div>
-          </button>
-          {deleteCustomer && <button className="rowDeleteButton" type="button" onClick={() => deleteCustomer(customer)}>삭제</button>}
+          </div>
         </div>)}</div>
         {filteredCustomers.length === 0 && <p className="empty">조건에 맞는 고객이 없습니다.</p>}
       </section>
@@ -1214,7 +1512,7 @@ function CustomerTab({ customers, selectedCustomer, phone, setPhone, history, se
             <label><span>주의사항 메모</span><textarea value={memo.caution || ''} onChange={(event) => updateMemo('caution', event.target.value)} placeholder="예: 예민함, 피부 약함, 만지기 싫어하는 부위" /></label>
           </div>
           <div className="panelTitle crmHistoryTitle"><h2>전체 서비스 이력</h2><span>행 클릭 시 상세/수정</span></div>
-          <div className="tableWrap crmHistoryWrap"><table className="crmHistoryTable"><thead><tr><th>날짜</th><th>구분</th><th>견명</th><th>서비스</th><th>담당자</th><th>금액</th><th>상태</th><th>메모</th></tr></thead><tbody>{historyRows.map((row) => <tr key={row.id} onClick={() => setModal({ type: 'detail', title: '서비스 이력 상세', item: row.detail || row })}><td>{formatServiceHistoryDate(row.date)}</td><td>{row.type || '기타'}</td><td>{row.petName || '-'}</td><td>{row.service || '-'}</td><td>{row.staff || '-'}</td><td>{formatServiceHistoryAmount(row.amount)}</td><td>{row.status || '-'}</td><td>{row.memo || '-'}</td></tr>)}</tbody></table>{historyHasError && <p className="historyWarning">서비스 이력을 불러오는 중 일부 데이터 형식 오류가 있습니다.</p>}{historyRows.length === 0 && <p className="empty">서비스 이력이 없습니다.</p>}</div>
+          <div className="tableWrap crmHistoryWrap"><table className="crmHistoryTable data-table"><thead><tr><th className={tableCellClass('date')}>날짜</th><th className={tableCellClass('type')}>구분</th><th className={tableCellClass('petName')}>견명</th><th className={tableCellClass('service')}>서비스</th><th className={tableCellClass('amount')}>금액</th><th className={tableCellClass('status')}>상태</th><th className={tableCellClass('memo')}>메모</th></tr></thead><tbody>{historyRows.map((row) => <tr key={row.id} onClick={() => setModal({ type: 'detail', title: '서비스 이력 상세', item: row.detail || row })}><td className={tableCellClass('date')}>{formatServiceHistoryDate(row.date)}</td><td className={tableCellClass('type')}>{row.type || '기타'}</td><td className={tableCellClass('petName')}>{row.petName || '-'}</td><td className={tableCellClass('service')}>{row.service || '-'}</td><td className={tableCellClass('amount')}>{formatServiceHistoryAmount(row.amount)}</td><td className={tableCellClass('status')}>{row.status || '-'}</td><td className={tableCellClass('memo')}>{row.memo || '-'}</td></tr>)}</tbody></table>{historyHasError && <p className="historyWarning">서비스 이력을 불러오는 중 일부 데이터 형식 오류가 있습니다.</p>}{historyRows.length === 0 && <p className="empty">서비스 이력이 없습니다.</p>}</div>
         </> : <EmptyState message="선택된 고객이 없습니다." />}
       </section>
     </div>
@@ -1231,8 +1529,8 @@ function monthlyLedgerRows(entries) {
   entries.forEach((item) => {
     const month = item.date.slice(0, 7)
     const current = map.get(month) || { id: 'month-' + month, month, income: 0, expense: 0, needsCheck: 0 }
-    if (item.type === '수익') current.income += Number(item.amount || 0)
-    if (item.type === '비용') current.expense += Number(item.amount || 0)
+    if (item.type === '수익') current.income += moneyNumber(item.amount)
+    if (item.type === '비용') current.expense += moneyNumber(item.amount)
     if (item.status === '확인필요') current.needsCheck += 1
     map.set(month, current)
   })
@@ -1268,14 +1566,26 @@ function StatsTab({ data }) {
     return queryOk && (!filters.from || row.date >= filters.from) && (!filters.to || row.date <= filters.to) && (filters.category === '전체' || row.category === filters.category) && (filters.staff === '전체' || row.staff === filters.staff) && (filters.status === '전체' || row.status === filters.status)
   })
   const columns = [{ key: 'date', label: '날짜' }, { key: 'category', label: '구분' }, { key: 'dogName', label: '견명' }, { key: 'breed', label: '견종' }, { key: 'guardianName', label: '보호자 이름' }, { key: 'phone', label: '전화번호' }, { key: 'staff', label: '담당자' }, { key: 'content', label: '서비스/상담 내용' }, { key: 'status', label: '상태' }, { key: 'amount', label: '금액' }, { key: 'memo', label: '메모' }]
-  const exportRows = filteredRows.map((row) => ({ ...row, date: formatDateWithDay(row.date), amount: Number(row.amount || 0) }))
-  return <div className="stack statsAdmin"><section className="panel statsToolbar"><div><h2>통합데이터 로그북</h2><p>미용, 입양, 고객, 회계, 매장용품 데이터를 한곳에서 확인하는 로그북입니다.</p></div><button className="largeAction" type="button" onClick={() => downloadXlsx(exportRows, columns, '해바라기_통합데이터_' + todayStamp() + '.xlsx')}>엑셀 다운로드</button></section><section className="panel statsFilters"><Input label="시작일" type="date" value={filters.from} onChange={(value) => setFilters({ ...filters, from: value })} /><Input label="종료일" type="date" value={filters.to} onChange={(value) => setFilters({ ...filters, to: value })} /><Select label="구분" value={filters.category} onChange={(value) => setFilters({ ...filters, category: value })} options={categories} /><Select label="담당자" value={filters.staff} onChange={(value) => setFilters({ ...filters, staff: value })} options={staffs} /><Select label="상태" value={filters.status} onChange={(value) => setFilters({ ...filters, status: value })} options={statuses} /><Input label="검색" value={filters.query} onChange={(value) => setFilters({ ...filters, query: value })} /></section><section className="panel statsTablePanel"><div className="panelTitle"><h2>통합데이터</h2><span>{filteredRows.length} / {rows.length}건</span></div><div className="statsTableWrap"><table className="statsTable"><thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead><tbody>{filteredRows.map((row) => <tr key={row.id}>{columns.map((column) => <td key={column.key}>{column.key === 'date' ? formatDateWithDay(row.date) : column.key === 'amount' ? currency(row.amount) : column.key === 'phone' ? (formatPhoneNumber(row.phone) || '-') : row[column.key] || '-'}</td>)}</tr>)}</tbody></table>{filteredRows.length === 0 && <p className="empty">조건에 맞는 데이터가 없습니다.</p>}</div></section></div>
+  const exportRows = filteredRows.map((row) => ({ ...row, date: formatDateWithDay(row.date), amount: moneyNumber(row.amount) }))
+  return <div className="stack statsAdmin"><section className="panel statsToolbar"><div><h2>통합데이터 로그북</h2><p>미용, 입양, 고객, 회계, 매장용품 데이터를 한곳에서 확인하는 로그북입니다.</p></div><button className="largeAction" type="button" onClick={() => downloadXlsx(exportRows, columns, '해바라기_통합데이터_' + todayStamp() + '.xlsx')}>엑셀 다운로드</button></section><section className="panel statsFilters"><Input label="시작일" type="date" value={filters.from} onChange={(value) => setFilters({ ...filters, from: value })} /><Input label="종료일" type="date" value={filters.to} onChange={(value) => setFilters({ ...filters, to: value })} /><Select label="구분" value={filters.category} onChange={(value) => setFilters({ ...filters, category: value })} options={categories} /><Select label="담당자" value={filters.staff} onChange={(value) => setFilters({ ...filters, staff: value })} options={staffs} /><Select label="상태" value={filters.status} onChange={(value) => setFilters({ ...filters, status: value })} options={statuses} /><Input label="검색" value={filters.query} onChange={(value) => setFilters({ ...filters, query: value })} /></section><section className="panel statsTablePanel"><div className="panelTitle"><h2>통합데이터</h2><span>{filteredRows.length} / {rows.length}건</span></div><div className="statsTableWrap"><table className="statsTable data-table"><thead><tr>{columns.map((column) => <th className={tableCellClass(column.key)} key={column.key}>{column.label}</th>)}</tr></thead><tbody>{filteredRows.map((row) => <tr key={row.id}>{columns.map((column) => <td className={tableCellClass(column.key)} key={column.key}>{column.key === 'date' ? formatDateWithDay(row.date) : column.key === 'amount' ? currency(row.amount) : column.key === 'phone' ? (formatPhoneNumber(row.phone) || '-') : row[column.key] || '-'}</td>)}</tr>)}</tbody></table>{filteredRows.length === 0 && <p className="empty">조건에 맞는 데이터가 없습니다.</p>}</div></section></div>
 }
 function EmptyState({ message }) {
   return <div className="emptyState"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M14 8h15l7 7v25H14z" /><path d="M29 8v8h7M19 24h12M19 30h12M19 36h8" /></svg><p>{message}</p></div>
 }
 function DataTable({ rows, columns, type, setModal, extraAction, onDelete }) {
-  return <div className="tableWrap"><table><thead><tr>{columns.map((column) => <th key={column}>{columnLabels[column] || column}</th>)}{onDelete && <th className="actionColumn">삭제</th>}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} onClick={() => setModal({ type, title: petLabel(row), item: row, extraAction })}>{columns.map((column) => <td key={column}>{displayValue(row, column)}</td>)}{onDelete && <td className="actionCell"><button className="rowDeleteButton" type="button" onClick={(event) => { event.stopPropagation(); onDelete(row) }}>삭제</button></td>}</tr>)}</tbody></table>{rows.length === 0 && <p className="empty">표시할 데이터가 없습니다.</p>}</div>
+  return <div className="tableWrap"><table className="data-table"><thead><tr>{columns.map((column) => <th className={tableCellClass(column)} key={column}>{columnLabels[column] || column}</th>)}{onDelete && <th className="actionColumn">삭제</th>}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} onClick={() => setModal({ type, title: petLabel(row), item: row, extraAction })}>{columns.map((column) => <td className={tableCellClass(column)} key={column}>{displayValue(row, column)}</td>)}{onDelete && <td className="actionCell"><button className="rowDeleteButton" type="button" onClick={(event) => { event.stopPropagation(); onDelete(row) }}>삭제</button></td>}</tr>)}</tbody></table>{rows.length === 0 && <p className="empty">표시할 데이터가 없습니다.</p>}</div>
+}
+function isNumberColumn(column) {
+  return ['price', 'amount', 'totalAmount', 'salesAmount', 'settlementAmount', 'income', 'expense', 'profit', 'finalPrice', 'intakeAmount', 'adoptionPrice', 'budget', 'ageMonths', 'quantity', 'count', 'adoptionAmount', 'purchasePrice'].includes(column)
+}
+function isDateColumn(column) {
+  return ['date', 'arrival', 'completedDate', 'visitDate', 'adoptionDate', 'createdAt', 'updatedAt'].includes(column)
+}
+function isPhoneColumn(column) {
+  return isPhoneField(column, columnLabels[column])
+}
+function tableCellClass(column) {
+  return ['col-' + column, isNumberColumn(column) ? 'number num' : '', isDateColumn(column) ? 'date' : '', isPhoneColumn(column) ? 'phone' : ''].filter(Boolean).join(' ')
 }
 function formatDateWithDay(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) return value || '-'
@@ -1283,18 +1593,37 @@ function formatDateWithDay(value) {
   return value + ' (' + day + ')'
 }
 function displayValue(row, column) {
-  if (['price', 'amount', 'totalAmount', 'salesAmount', 'settlementAmount', 'income', 'expense', 'profit', 'finalPrice', 'intakeAmount', 'adoptionPrice'].includes(column)) return currency(row[column])
-  if (column === 'date' || column === 'completedDate' || column === 'arrival') return formatDateWithDay(row[column])
+  const moneyColumns = ['price', 'amount', 'totalAmount', 'salesAmount', 'settlementAmount', 'income', 'expense', 'profit', 'finalPrice', 'intakeAmount', 'adoptionPrice', 'budget', 'purchasePrice', 'adoptionAmount']
+  if (moneyColumns.includes(column)) return formatCurrency(row[column]) || '-'
+  if (column === 'ageMonths') return calculateAgeMonths(row?.birth) || missingText(row?.ageMonths)
+  if (column === 'date' || column === 'completedDate' || column === 'arrival' || column === 'visitDate' || column === 'adoptionDate') return formatDateWithDay(row[column])
   if (isPhoneField(column, columnLabels[column])) return formatPhoneNumber(row[column]) || '-'
   if (column === 'receiptAttached') return row.receiptAttached ? '첨부' : '미첨부'
-  if (column === 'consultant') return replaceRole(row[column])
-  return row[column] || '-'
+  if (column === 'consultant') return replaceRole(row[column]) || '-'
+  const value = row?.[column]
+  return value === undefined || value === null || value === '' || String(value) === 'NaN' || String(value) === 'undefined' || String(value) === 'null' ? '-' : value
 }
-const columnLabels = { dogName: '견명', name: '견명', petName: '견명', ownerName: '보호자', type: '구분', service: '서비스', breed: '견종', guardianName: '보호자', phone: '전화번호', date: '날짜', time: '예약시간', serviceType: '서비스유형', options: '추가옵션', price: '가격', staff: '담당자', status: '상태', paymentStatus: '결제상태', consultant: '담당자', gender: '성별', arrival: '입소일', outgoing: '출고일', vendor: '거래처', itemType: '품목구분', totalAmount: '총매입금액', type: '구분', amount: '금액', title: '항목명', customerVendor: '고객/거래처', receiptAttached: '영수증', receiptName: '영수증명', salesAmount: '미용매출', settlementAmount: '정산금액', month: '월', income: '총수익', expense: '총비용', profit: '순이익', needsCheck: '확인필요', ageMonths: '개월수', intakeAmount: '도입가', completedDate: '입양완료일', finalPrice: '입양가', specialNote: '특이사항', profileNo: '관리번호', birth: '생년월일', coatColor: '모색', source: '입소처', adoptionPrice: '입양가', healthStatus: '건강상태', vaccination: '접종정보', photoName: '사진첨부' }
+function detailDisplayValue(key, value) {
+  const moneyColumns = ['price', 'amount', 'totalAmount', 'intakeAmount', 'adoptionPrice', 'finalPrice', 'budget', 'purchasePrice', 'adoptionAmount', 'salesAmount', 'settlementAmount']
+  if (moneyColumns.includes(key)) return formatCurrency(value) || '-'
+  if (key === 'date' || key === 'completedDate' || key === 'arrival' || key === 'visitDate' || key === 'adoptionDate') return formatDateWithDay(value)
+  if (isPhoneField(key, columnLabels[key])) return formatPhoneNumber(value) || '-'
+  if (key === 'consultant') return replaceRole(value) || '-'
+  return value === undefined || value === null || value === '' || String(value) === 'NaN' || String(value) === 'undefined' || String(value) === 'null' ? '-' : String(value)
+}
+const columnLabels = { region: '거주지역', preferredBreed: '희망 견종', preferredGender: '희망 성별', budget: '희망 예산', visitDate: '방문 가능일', route: '상담 경로', contractProgress: '계약 진행 여부', adoptionDate: '입양일', puppyId: '선택 퍼피ID', manager: '담당자명', mainItem: '주 취급품목', dogName: '견명', name: '견명', petName: '견명', ownerName: '보호자', type: '구분', service: '서비스', breed: '견종', guardianName: '보호자', phone: '전화번호', date: '날짜', time: '예약시간', serviceType: '서비스유형', options: '추가옵션', price: '가격', staff: '담당자', status: '상태', paymentStatus: '결제상태', consultant: '담당자', gender: '성별', arrival: '입소일', outgoing: '출고일', vendor: '납품업체명', supplierName: '거래처명', vendorName: '거래처명', supplier_name: '거래처명', vendor_name: '거래처명', managerName: '담당자명', manager_name: '담당자명', mainItems: '주 취급품목', main_items: '주 취급품목', paymentMethod: '결제조건', payment_method: '결제조건', puppyName: '견명', ownerName: '보호자명', ownerPhone: '전화번호', purchasePrice: '도입가', createdAt: '등록일', updatedAt: '수정일', created_at: '등록일', updated_at: '수정일', itemType: '품목구분', totalAmount: '총매입금액', type: '구분', amount: '금액', title: '항목명', customerVendor: '고객/거래처', receiptAttached: '영수증', receiptName: '영수증명', salesAmount: '미용매출', settlementAmount: '정산금액', month: '월', income: '총수익', expense: '총비용', profit: '순이익', needsCheck: '확인필요', ageMonths: '개월수', intakeAmount: '도입가', completedDate: '입양완료일', finalPrice: '입양가', specialNote: '특이사항', profileNo: '관리번호', birth: '생년월일', coatColor: '모색', source: '입소처', adoptionPrice: '입양가', healthStatus: '건강상태', vaccination: '접종정보', photoName: '사진첨부' }
+function isMoneyField(fieldKey, label, type) {
+  return type === 'number' || ['가격', '금액', '입양가', '도입가', '총매입금액', '희망 예산', '미용매출', '정산금액'].some((word) => String(label || '').includes(word)) || ['price', 'amount', 'totalAmount', 'budget', 'finalPrice', 'intakeAmount', 'adoptionPrice', 'purchasePrice', 'adoptionAmount', 'salesAmount', 'settlementAmount'].includes(fieldKey)
+}
 function Input({ label, value, onChange, type = 'text', fieldKey = '' }) {
   const phoneField = isPhoneField(fieldKey, label)
-  const display = phoneField ? formatPhoneNumber(value) : (value ?? '')
+  const moneyField = !phoneField && isMoneyField(fieldKey, label, type)
+  const display = phoneField ? formatPhoneNumber(value) : moneyField ? formatCurrency(value) : (value ?? '')
   function handleChange(event) {
+    if (moneyField) {
+      onChange(event.target.value.replace(/[^0-9]/g, ''))
+      return
+    }
     if (!phoneField) {
       onChange(event.target.value)
       return
@@ -1308,33 +1637,54 @@ function Input({ label, value, onChange, type = 'text', fieldKey = '' }) {
       let nextCursor = 0
       let seenDigits = 0
       while (nextCursor < formatted.length && seenDigits < digitsBeforeCursor) {
-        if (/\\d/.test(formatted[nextCursor])) seenDigits += 1
+        if (/\d/.test(formatted[nextCursor])) seenDigits += 1
         nextCursor += 1
       }
       try { event.target.setSelectionRange(nextCursor, nextCursor) } catch {}
     })
   }
-  return <label className="field"><span>{label}</span><input type={phoneField ? 'tel' : type} inputMode={phoneField ? 'numeric' : undefined} maxLength={phoneField ? 13 : undefined} value={display} onChange={handleChange} /></label>
+  return <label className="field"><span>{label}</span><input type={phoneField || moneyField ? 'tel' : type} inputMode={phoneField || moneyField ? 'numeric' : undefined} maxLength={phoneField ? 13 : undefined} value={display} onChange={handleChange} /></label>
 }
-function Select({ label, value, onChange, options }) { return <label className="field"><span>{label}</span><select value={value ?? ''} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label> }
+function Select({ label, value, onChange, options }) {
+  const safeOptions = Array.from(new Set([...(options || []), value].filter((option) => option !== undefined && option !== null && option !== '')))
+  return <label className="field"><span>{label}</span><select value={value ?? ''} onChange={(event) => onChange(event.target.value)}>{safeOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+}
+function ChoiceSelect({ label, value, onChange, options }) {
+  const safeOptions = Array.from(new Set([...(options || []), value].filter((option) => option !== undefined && option !== null && option !== '')))
+  return <div className="field choiceSelectField"><span>{label}</span><div className="optionButtonGroup singleChoiceGroup">{safeOptions.map((option) => <button key={option} className={value === option ? 'selected' : ''} type="button" onClick={() => onChange(option)}>{option}</button>)}</div></div>
+}
+function MultiSelect({ label, value, onChange, options }) {
+  const selected = new Set(splitAdditionalOptions(value))
+  function toggle(option) {
+    const next = new Set(selected)
+    if (next.has(option)) next.delete(option)
+    else next.add(option)
+    onChange(normalizeAdditionalOptions(Array.from(next)))
+  }
+  return <div className="field multiSelectField"><span>{label}</span><div className="multiSelectOptions">{options.map((option) => <button key={option} className={selected.has(option) ? 'selected' : ''} type="button" onClick={() => toggle(option)}>{option}</button>)}</div></div>
+}
 function ReceiptInput({ label, onChange }) { return <label className="field"><span>{label}</span><input type="file" onChange={(event) => onChange(event.target.files?.[0]?.name || '')} /></label> }
 function Modal(props) {
   const { modal, onClose } = props
   return <div className="modalBackdrop" role="presentation" onMouseDown={onClose}><section className="modalCard" role="dialog" aria-modal="true" aria-label={modal.title} onMouseDown={(event) => event.stopPropagation()}><div className="modalHeader"><h2>{modal.title}</h2><button type="button" onClick={onClose}>닫기</button></div><ModalBody {...props} /></section></div>
 }
-function ModalBody({ modal, saveGrooming, saveAdoption, savePuppy, addPuppy, deletePuppy, completePuppyAdoption, saveSupply, saveAccounting, saveSettlement, completeAdoption, chooseExistingCustomer, createGrooming, setAccountingStatus, setAccountingSettlement, setSettlementStatus, deleteGrooming, deleteAdoption, deleteSupply }) {
+function ModalBody({ modal, saveGrooming, saveAdoption, addAdoption, savePuppy, addPuppy, deletePuppy, completePuppyAdoption, saveSupply, saveAccounting, saveSettlement, completeAdoption, chooseExistingCustomer, createGrooming, setAccountingStatus, setAccountingSettlement, setSettlementStatus, deleteGrooming, deleteAdoption, deleteSupply, addSupplyVendor, saveSupplyVendor, deleteSupplyVendor, activePuppies }) {
   const [draft, setDraft] = useState(modal.item || {})
   if (modal.type === 'booking') return <BookingFlow customers={modal.customers || []} createGrooming={createGrooming} chooseExistingCustomer={chooseExistingCustomer} />
   if (modal.type === 'list') return <div className="modalList">{modal.list.length === 0 ? <p className="empty">표시할 데이터가 없습니다.</p> : sortByDateTime(modal.list).map((item) => <div className="modalLine" key={item.id}><strong>{petLabel(item)}</strong><span>{formatDateWithDay(item.date)} · {item.time || item.status} · {item.staff || item.consultant || ''}</span></div>)}</div>
+  if (modal.type === 'grooming-day-list') return <div className="modalList careDayModal">{sortByDateTime((modal.list || []).filter((item) => !isCanceledGrooming(item))).length === 0 ? <p className="empty">표시할 예약이 없습니다.</p> : sortByDateTime((modal.list || []).filter((item) => !isCanceledGrooming(item))).map((item) => <div className="modalLine careDayLine" key={item.id}><div><strong>{item.time || '-'} · {item.dogName || '-'}</strong><span>{item.breed || '-'} · {item.guardianName || '보호자 미등록'} · {item.serviceType || '-'} · {item.options || '-'}</span></div><div className="careDayMeta"><i className={`staffBadge ${staffClass(item.staff)}`}>{item.staff || '-'}</i><b>{currency(item.price)}</b><em>{normalizeGroomingStatus(item.status)}</em></div></div>)}</div>
   if (modal.type === 'choose-customer') return <div className="modalList">{modal.customers.map((customer) => <button className="modalLine" type="button" key={customer.phone} onClick={() => chooseExistingCustomer(customer)}><strong>{customer.guardianName} · {customer.dogName}</strong><span>{formatPhoneNumber(customer.phone)} · 기존 고객 재예약</span></button>)}</div>
   if (modal.type === 'edit-grooming') return <GroomingEditForm draft={draft} setDraft={setDraft} onSave={saveGrooming} onDelete={deleteGrooming} />
-  if (modal.type === 'edit-adoption') return <EditForm draft={draft} setDraft={setDraft} fields={adoptionFields} onSave={() => saveAdoption(draft)} onDelete={() => deleteAdoption(draft)} extra={draft.status !== '입양완료' && <button className="primaryAction" type="button" onClick={() => completeAdoption(draft)}>입양완료 처리</button>} />
-  if (modal.type === 'new-puppy') return <EditForm draft={draft} setDraft={setDraft} fields={puppyFields} onSave={() => addPuppy(draft)} />
+  if (modal.type === 'new-adoption') return <AdoptionMatchForm draft={draft} setDraft={setDraft} puppies={activePuppies || []} onSave={() => addAdoption(draft)} onComplete={(next) => addAdoption(next || draft)} />
+  if (modal.type === 'edit-adoption') return <AdoptionMatchForm draft={draft} setDraft={setDraft} puppies={activePuppies || []} onSave={() => saveAdoption(draft)} onDelete={() => deleteAdoption(draft)} onComplete={(next) => completeAdoption(next || draft)} />
+  if (modal.type === 'new-puppy') return <EditForm draft={draft} setDraft={setDraft} fields={puppyCreateFields} onSave={() => addPuppy(draft)} />
   if (modal.type === 'edit-puppy') return <EditForm draft={draft} setDraft={setDraft} fields={puppyFields} onSave={() => savePuppy(draft)} onDelete={() => deletePuppy(draft)} extra={<><button className="primaryAction" type="button" onClick={() => completePuppyAdoption(draft)}>입양완료 처리</button><button className="primaryAction" type="button" onClick={() => savePuppy({ ...draft, status: '확인필요' })}>확인필요 처리</button></>} />
   if (modal.type === 'edit-supply') return <EditForm draft={draft} setDraft={setDraft} fields={supplyFields} onSave={() => saveSupply(draft)} onDelete={deleteSupply ? () => deleteSupply(draft) : null} />
+  if (modal.type === 'new-supply-vendor') return <EditForm draft={draft} setDraft={setDraft} fields={supplyVendorFields} onSave={() => addSupplyVendor(draft)} />
+  if (modal.type === 'edit-supply-vendor') return <EditForm draft={draft} setDraft={setDraft} fields={supplyVendorFields} onSave={() => saveSupplyVendor(draft)} onDelete={deleteSupplyVendor ? () => deleteSupplyVendor(draft) : null} />
   if (modal.type === 'edit-settlement') return <EditForm draft={draft} setDraft={setDraft} fields={settlementFields} onSave={() => saveSettlement(draft)} extra={<button className="primaryAction" type="button" onClick={() => setSettlementStatus(draft.id, '정산완료')}>정산완료</button>} />
   if (modal.type === 'edit-accounting') return <EditForm draft={draft} setDraft={setDraft} fields={accountingFields} onSave={() => saveAccounting(draft)} extra={<><button className="primaryAction" type="button" onClick={() => setAccountingStatus(draft.id, '처리완료')}>처리완료</button><button className="primaryAction" type="button" onClick={() => setAccountingStatus(draft.id, '확인필요')}>확인필요</button>{draft.settlementStatus !== '-' && <button className="primaryAction" type="button" onClick={() => setAccountingSettlement(draft.id, '정산완료')}>정산완료</button>}</>} />
-  return <div className="detailGrid">{Object.entries(modal.item || {}).filter(([key]) => key !== 'id').map(([key, value]) => <div key={key}><dt>{columnLabels[key] || key}</dt><dd>{['price', 'amount', 'totalAmount', 'intakeAmount', 'adoptionPrice', 'finalPrice'].includes(key) ? currency(value) : key === 'date' || key === 'completedDate' || key === 'arrival' ? formatDateWithDay(value) : String(value)}</dd></div>)}</div>
+  return <div className="detailGrid">{Object.entries(modal.item || {}).filter(([key]) => key !== 'id').map(([key, value]) => <div key={key}><dt>{columnLabels[key] || key}</dt><dd>{detailDisplayValue(key, value)}</dd></div>)}</div>
 }
 function BookingFlow({ customers, createGrooming }) {
   const [step, setStep] = useState('type')
@@ -1362,7 +1712,7 @@ function BookingFlow({ customers, createGrooming }) {
   if (step === 'type') return <div className="bookingFlow"><div className="choiceGrid"><button type="button" onClick={startNew}><strong>신규 고객</strong><span>회원등록 후 예약정보 입력</span></button><button type="button" onClick={() => setStep('existing')}><strong>기존 고객</strong><span>검색 후 바로 예약정보 입력</span></button></div></div>
   if (step === 'new-member') return <div className="bookingFlow"><div className="detailGrid"><Input label="견명" value={member.dogName} onChange={(value) => setMember({ ...member, dogName: value })} /><Input label="보호자 이름" value={member.guardianName} onChange={(value) => setMember({ ...member, guardianName: value })} /><Input label="보호자 전화번호" value={member.phone} onChange={(value) => setMember({ ...member, phone: formatPhoneNumber(value) })} /><Input label="견종" value={member.breed} onChange={(value) => setMember({ ...member, breed: value })} /><Select label="성별" value={member.gender} onChange={(value) => setMember({ ...member, gender: value })} options={genderOptions} /><Select label="나이 단위" value={member.ageUnit} onChange={(value) => setMember({ ...member, ageUnit: value, ageValue: '1' })} options={['개월', '살']} /><Select label="나이/개월수" value={member.ageValue} onChange={(value) => setMember({ ...member, ageValue: value })} options={ageValues} /><Select label="첫 방문 경로" value={member.visitPath} onChange={(value) => setMember({ ...member, visitPath: value })} options={visitPathOptions} /><Input label="특이사항" value={member.memo} onChange={(value) => setMember({ ...member, memo: value })} /></div><div className="modalActions"><button type="button" onClick={() => setStep('type')}>이전</button><button className="primaryAction" type="button" onClick={completeMember}>회원등록 완료</button></div></div>
   if (step === 'existing') return <div className="bookingFlow"><Input label="보호자 전화번호 또는 견명 검색" value={query} onChange={setQuery} /><div className="modalList customerPickList">{filtered.map((customer) => <button className="modalLine" type="button" key={customer.phone} onClick={() => selectCustomer(customer)}><strong>{customer.guardianName} · {customer.dogName}</strong><span>{formatPhoneNumber(customer.phone)}</span></button>)}</div><div className="modalActions"><button type="button" onClick={() => setStep('type')}>이전</button></div></div>
-  return <div className="bookingFlow"><div className="detailGrid"><Input label="예약날짜" type="date" value={reservation.date} onChange={(value) => setReservation({ ...reservation, date: value })} /><Input label="예약시간" type="time" value={reservation.time} onChange={(value) => setReservation({ ...reservation, time: value })} /><Select label="서비스유형" value={reservation.serviceType} onChange={(value) => setReservation({ ...reservation, serviceType: value })} options={serviceTypes} /><Select label="추가옵션" value={reservation.options} onChange={(value) => setReservation({ ...reservation, options: value })} options={additionalOptions} /><Input label="가격" type="number" value={reservation.price} onChange={(value) => setReservation({ ...reservation, price: value })} /><Select label="담당자" value={reservation.staff} onChange={(value) => setReservation({ ...reservation, staff: value })} options={staffList} /><Select label="진행상태" value={reservation.status} onChange={(value) => setReservation({ ...reservation, status: value })} options={statusList} /><Select label="결제상태" value={reservation.paymentStatus} onChange={(value) => setReservation({ ...reservation, paymentStatus: value })} options={paymentStatusList} /><Input label="특이사항" value={reservation.memo} onChange={(value) => setReservation({ ...reservation, memo: value })} /></div><div className="modalActions"><button type="button" onClick={() => setStep('type')}>처음으로</button><button className="primaryAction" type="button" onClick={submitReservation}>예약 저장</button></div></div>
+  return <div className="bookingFlow"><div className="detailGrid"><Input label="예약날짜" type="date" value={reservation.date} onChange={(value) => setReservation({ ...reservation, date: value })} /><Select label="예약시간" value={reservation.time} onChange={(value) => setReservation({ ...reservation, time: value })} options={timeOptions} /><Select label="서비스유형" value={reservation.serviceType} onChange={(value) => setReservation({ ...reservation, serviceType: value })} options={serviceTypes} /><Select label="추가옵션" value={reservation.options} onChange={(value) => setReservation({ ...reservation, options: value })} options={additionalOptions} /><Input label="가격" type="number" value={reservation.price} onChange={(value) => setReservation({ ...reservation, price: value })} /><Select label="담당자" value={reservation.staff} onChange={(value) => setReservation({ ...reservation, staff: value })} options={staffList} /><Select label="진행상태" value={reservation.status} onChange={(value) => setReservation({ ...reservation, status: value })} options={statusList} /><Select label="결제상태" value={reservation.paymentStatus} onChange={(value) => setReservation({ ...reservation, paymentStatus: value })} options={paymentStatusList} /><Input label="특이사항" value={reservation.memo} onChange={(value) => setReservation({ ...reservation, memo: value })} /></div><div className="modalActions"><button type="button" onClick={() => setStep('type')}>처음으로</button><button className="primaryAction" type="button" onClick={submitReservation}>예약 저장</button></div></div>
 }
 
 function GroomingEditForm({ draft, setDraft, onSave, onDelete }) {
@@ -1371,9 +1721,15 @@ function GroomingEditForm({ draft, setDraft, onSave, onDelete }) {
   const [changeDate, setChangeDate] = useState(draft.date || today)
   const [changeTime, setChangeTime] = useState(draft.time || '10:00')
   const [cancelMemo, setCancelMemo] = useState('')
+  const normalizedStatus = normalizeGroomingStatus(draft.status)
   const handleStatus = (value) => {
     setDraft({ ...draft, status: value })
     setCancelStep(value === '취소')
+  }
+  const quickSave = (patch) => {
+    const next = { ...draft, ...patch }
+    setDraft(next)
+    onSave({ ...next, phone: formatPhoneNumber(next.phone), status: normalizeGroomingStatus(next.status) })
   }
   const saveCancelFlow = () => {
     if (cancelChoice === 'change') {
@@ -1382,16 +1738,60 @@ function GroomingEditForm({ draft, setDraft, onSave, onDelete }) {
     }
     onSave({ ...draft, status: '취소', memo: appendMemo(draft.memo, cancelMemo || '취소 처리') })
   }
-  return <div className="editArea"><div className="detailGrid">{groomingFields.map((field) => field.key === 'status' ? <Select key={field.key} label={field.label} value={draft[field.key]} onChange={handleStatus} options={field.options} /> : field.options ? <Select key={field.key} label={field.label} value={draft[field.key]} onChange={(value) => setDraft({ ...draft, [field.key]: value })} options={field.options} /> : <Input key={field.key} fieldKey={field.key} label={field.label} type={field.type || 'text'} value={draft[field.key]} onChange={(value) => setDraft({ ...draft, [field.key]: isPhoneField(field.key, field.label) ? formatPhoneNumber(value) : value })} />)}</div>{cancelStep && <section className="cancelPanel"><h3>예약 변경 또는 취소 처리</h3><div className="choiceGrid compactChoice"><button className={cancelChoice === 'change' ? 'selected' : ''} type="button" onClick={() => setCancelChoice('change')}><strong>예약 날짜/시간 변경</strong></button><button className={cancelChoice === 'cancel' ? 'selected' : ''} type="button" onClick={() => setCancelChoice('cancel')}><strong>취소 처리</strong></button></div>{cancelChoice === 'change' ? <div className="detailGrid"><Input label="변경할 예약날짜" type="date" value={changeDate} onChange={setChangeDate} /><Input label="변경할 예약시간" type="time" value={changeTime} onChange={setChangeTime} /></div> : <Input label="취소 메모" value={cancelMemo} onChange={setCancelMemo} />}</section>}<div className="modalActions"><button className="primaryAction dangerAction" type="button" onClick={() => onDelete(draft.id)}>삭제</button>{cancelStep ? <button className="primaryAction" type="button" onClick={saveCancelFlow}>저장</button> : <button className="primaryAction" type="button" onClick={() => onSave({ ...draft, phone: formatPhoneNumber(draft.phone) })}>저장</button>}</div></div>
+  return <div className="editArea groomingQuickEdit"><section className="quickStatusPanel"><h3>진행현황</h3><div className="quickButtonGroup">{statusList.map((status) => <button className={normalizedStatus === status ? 'selected' : ''} key={status} type="button" onClick={() => quickSave({ status })}>{status}</button>)}</div></section><div className="detailGrid">{groomingFields.map((field) => field.key === 'status' ? <Select key={field.key} label={field.label} value={normalizedStatus} onChange={handleStatus} options={field.options} /> : field.options ? <Select key={field.key} label={field.label} value={draft[field.key]} onChange={(value) => setDraft({ ...draft, [field.key]: value })} options={field.options} /> : <Input key={field.key} fieldKey={field.key} label={field.label} type={field.type || 'text'} value={draft[field.key]} onChange={(value) => setDraft({ ...draft, [field.key]: isPhoneField(field.key, field.label) ? formatPhoneNumber(value) : value })} />)}</div>{cancelStep && <section className="cancelPanel"><h3>예약 변경 또는 취소 처리</h3><div className="choiceGrid compactChoice"><button className={cancelChoice === 'change' ? 'selected' : ''} type="button" onClick={() => setCancelChoice('change')}><strong>예약 날짜/시간 변경</strong></button><button className={cancelChoice === 'cancel' ? 'selected' : ''} type="button" onClick={() => setCancelChoice('cancel')}><strong>취소 처리</strong></button></div>{cancelChoice === 'change' ? <div className="detailGrid"><Input label="변경할 예약날짜" type="date" value={changeDate} onChange={setChangeDate} /><Select label="변경할 예약시간" value={changeTime} onChange={setChangeTime} options={timeOptions} /></div> : <Input label="취소 메모" value={cancelMemo} onChange={setCancelMemo} />}</section>}<section className="quickStatusPanel paymentQuickPanel"><h3>결제현황</h3><div className="quickButtonGroup paymentButtons">{paymentStatusList.map((status) => <button className={draft.paymentStatus === status ? 'selected' : ''} key={status} type="button" onClick={() => quickSave({ paymentStatus: status })}>{status}</button>)}</div></section><div className="modalActions">{onDelete && <button className="primaryAction dangerAction" type="button" onClick={() => onDelete(draft.id)}>삭제</button>}{cancelStep ? <button className="primaryAction" type="button" onClick={saveCancelFlow}>저장</button> : <button className="primaryAction" type="button" onClick={() => onSave({ ...draft, phone: formatPhoneNumber(draft.phone), status: normalizeGroomingStatus(draft.status) })}>저장</button>}</div></div>
+}
+function AdoptionMatchForm({ draft, setDraft, puppies, onSave, onDelete, onComplete }) {
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const selectedPuppy = puppies.find((puppy) => puppy.id === draft.puppyId) || null
+  const dogBirth = draft.birth || selectedPuppy?.birth || ''
+  const dogInfo = {
+    dogName: draft.dogName || selectedPuppy?.name || '-',
+    breed: draft.breed || selectedPuppy?.breed || '-',
+    gender: draft.gender || selectedPuppy?.gender || '-',
+    ageMonths: calculateAgeMonths(dogBirth) || draft.ageMonths || selectedPuppy?.ageMonths || '-',
+    price: draft.price || selectedPuppy?.adoptionPrice || 0,
+  }
+  function choosePuppy(puppy) {
+    setDraft({
+      ...draft,
+      puppyId: puppy.id,
+      profileNo: puppy.profileNo,
+      dogName: puppy.name || puppy.dogName || '',
+      breed: puppy.breed || '',
+      gender: puppy.gender || '',
+      birth: puppy.birth || '',
+      ageMonths: calculateAgeMonths(puppy.birth) || '',
+      arrival: puppy.arrival || '',
+      price: puppy.adoptionPrice || puppy.finalPrice || draft.price || 0,
+      intakeAmount: puppy.intakeAmount || puppy.purchasePrice || 0,
+      consultant: draft.consultant || puppy.consultant || '퍼피 컨설턴트',
+    })
+    setPickerOpen(false)
+  }
+  function completeNow() {
+    const next = { ...draft, phone: formatPhoneNumber(draft.phone), status: '입양완료', adoptionDate: draft.adoptionDate || draft.date || today, date: draft.adoptionDate || draft.date || today }
+    if (!next.puppyId) {
+      window.alert('강아지를 선택해주세요.')
+      return
+    }
+    if (!next.guardianName || !phoneDigits(next.phone) || !moneyNumber(next.price)) {
+      window.alert('입양자 정보와 입양금액을 입력해주세요.')
+      return
+    }
+    if (!window.confirm('입양완료 처리하시겠습니까?')) return
+    onComplete(next)
+  }
+  return <div className="editArea adoptionMatchForm"><section className="adoptionDogInfo"><div className="panelTitle"><h3>강아지 정보</h3><button className="primaryAction" type="button" onClick={() => setPickerOpen(true)}>강아지 선택</button></div><div className="dogInfoGrid"><InfoCard label="견명" value={displayValue(dogInfo, 'dogName')} /><InfoCard label="견종" value={displayValue(dogInfo, 'breed')} /><InfoCard label="개월수" value={displayValue(dogInfo, 'ageMonths')} /><InfoCard label="성별" value={displayValue(dogInfo, 'gender')} /><InfoCard label="입양가" value={displayValue(dogInfo, 'price')} /></div>{pickerOpen && <div className="innerPickerBackdrop" role="presentation" onMouseDown={() => setPickerOpen(false)}><section className="innerPickerCard" role="dialog" aria-modal="true" aria-label="강아지 선택" onMouseDown={(event) => event.stopPropagation()}><div className="panelTitle"><h3>강아지 선택</h3><button type="button" onClick={() => setPickerOpen(false)}>닫기</button></div><div className="tableWrap puppySelectTableWrap"><table className="puppySelectTable data-table"><thead><tr><th>견명</th><th>견종</th><th>개월수</th><th>성별</th><th>입양가</th><th>특징</th></tr></thead><tbody>{puppies.map((puppy) => <tr key={puppy.id} onClick={() => choosePuppy(puppy)}><td>{displayValue(puppy, 'name')}</td><td>{displayValue(puppy, 'breed')}</td><td className="number">{displayValue(puppy, 'ageMonths')}</td><td>{displayValue(puppy, 'gender')}</td><td className="number">{displayValue(puppy, 'adoptionPrice')}</td><td>{missingText(puppy.memo || puppy.healthStatus || puppy.coatColor)}</td></tr>)}</tbody></table>{puppies.length === 0 && <p className="empty">선택 가능한 퍼피가 없습니다.</p>}</div></section></div>}</section><section className="adoptionOwnerInfo"><h3>입양자 정보</h3><div className="detailGrid"><Input label="보호자 이름" value={draft.guardianName} onChange={(value) => setDraft({ ...draft, guardianName: value })} /><Input label="전화번호" value={draft.phone} onChange={(value) => setDraft({ ...draft, phone: formatPhoneNumber(value) })} /><Input label="거주지역" value={draft.region} onChange={(value) => setDraft({ ...draft, region: value })} /><Select label="결제조건" value={draft.paymentMethod || '계좌이체'} onChange={(value) => setDraft({ ...draft, paymentMethod: value })} options={supplyPaymentMethods} /><Input label="입양금액" type="number" value={draft.price} onChange={(value) => setDraft({ ...draft, price: value })} /><Input label="입양일" type="date" value={draft.adoptionDate || draft.date || today} onChange={(value) => setDraft({ ...draft, adoptionDate: value, date: value })} /><label className="field textAreaField"><span>특이사항</span><textarea value={draft.specialNote || ''} onChange={(event) => setDraft({ ...draft, specialNote: event.target.value })} /></label></div></section><div className="modalActions">{onComplete && <button className="primaryAction" type="button" onClick={completeNow}>입양완료</button>}{onDelete && <button className="primaryAction dangerAction" type="button" onClick={onDelete}>삭제</button>}<button className="primaryAction" type="button" onClick={() => onSave({ ...draft, phone: formatPhoneNumber(draft.phone), specialNote: draft.specialNote || '' })}>저장</button></div></div>
 }
 function EditForm({ draft, setDraft, fields, onSave, extra, onDelete }) {
-  return <div className="editArea"><div className="detailGrid">{fields.map((field) => field.options ? <Select key={field.key} label={field.label} value={draft[field.key]} onChange={(value) => setDraft({ ...draft, [field.key]: value })} options={field.options} /> : field.type === 'file' ? <ReceiptInput key={field.key} label={field.label} onChange={(fileName) => field.key === 'photoUpload' ? setDraft({ ...draft, photoName: fileName }) : setDraft({ ...draft, receiptAttached: Boolean(fileName), receiptName: fileName })} /> : <Input key={field.key} fieldKey={field.key} label={field.label} type={field.type || 'text'} value={draft[field.key]} onChange={(value) => setDraft({ ...draft, [field.key]: isPhoneField(field.key, field.label) ? formatPhoneNumber(value) : value })} />)}</div><div className="modalActions"><button type="button">수정</button>{extra}{onDelete && <button className="primaryAction dangerAction" type="button" onClick={onDelete}>삭제</button>}<button className="primaryAction" type="button" onClick={onSave}>저장</button></div></div>
+  return <div className="editArea"><div className="detailGrid">{fields.map((field) => field.multiple ? <MultiSelect key={field.key} label={field.label} value={draft[field.key]} onChange={(value) => setDraft({ ...draft, [field.key]: value })} options={field.options} /> : field.options ? <Select key={field.key} label={field.label} value={draft[field.key]} onChange={(value) => setDraft({ ...draft, [field.key]: value })} options={field.options} /> : field.type === 'file' ? <ReceiptInput key={field.key} label={field.label} onChange={(fileName) => field.key === 'photoUpload' ? setDraft({ ...draft, photoName: fileName }) : setDraft({ ...draft, receiptAttached: Boolean(fileName), receiptName: fileName })} /> : <Input key={field.key} fieldKey={field.key} label={field.label} type={field.type || 'text'} value={draft[field.key]} onChange={(value) => setDraft({ ...draft, [field.key]: isPhoneField(field.key, field.label) ? formatPhoneNumber(value) : value })} />)}</div><div className="modalActions"><button type="button">수정</button>{extra}{onDelete && <button className="primaryAction dangerAction" type="button" onClick={onDelete}>삭제</button>}<button className="primaryAction" type="button" onClick={onSave}>저장</button></div></div>
 }
-const groomingFields = [{ key: 'dogName', label: '견명' }, { key: 'breed', label: '견종' }, { key: 'guardianName', label: '보호자 이름' }, { key: 'phone', label: '전화번호' }, { key: 'date', label: '예약날짜', type: 'date' }, { key: 'time', label: '예약시간', type: 'time' }, { key: 'serviceType', label: '서비스유형', options: serviceTypes }, { key: 'options', label: '추가옵션', options: additionalOptions }, { key: 'price', label: '가격', type: 'number' }, { key: 'staff', label: '담당자', options: staffList }, { key: 'status', label: '진행상태', options: statusList }, { key: 'paymentStatus', label: '결제상태', options: paymentStatusList }, { key: 'paymentMethod', label: '결제수단' }, { key: 'memo', label: '메모' }]
-const adoptionFields = [{ key: 'dogName', label: '견명' }, { key: 'breed', label: '견종' }, { key: 'guardianName', label: '보호자 이름' }, { key: 'phone', label: '전화번호' }, { key: 'date', label: '상담일', type: 'date' }, { key: 'consultant', label: '담당자' }, { key: 'status', label: '상담상태', options: ['상담중', '입양완료', '보류', '확인필요'] }, { key: 'price', label: '입양가', type: 'number' }, { key: 'paymentMethod', label: '결제수단' }, { key: 'memo', label: '메모' }]
-const puppyFields = [{ key: 'profileNo', label: '관리번호' }, { key: 'arrival', label: '입소일', type: 'date' }, { key: 'name', label: '견명' }, { key: 'breed', label: '견종' }, { key: 'gender', label: '성별', options: genderOptions }, { key: 'birth', label: '생년월일', type: 'date' }, { key: 'ageMonths', label: '개월수' }, { key: 'coatColor', label: '모색' }, { key: 'source', label: '입소처' }, { key: 'intakeAmount', label: '도입가', type: 'number' }, { key: 'adoptionPrice', label: '입양가', type: 'number' }, { key: 'status', label: '현재상태', options: puppyStatusList }, { key: 'healthStatus', label: '건강상태' }, { key: 'vaccination', label: '접종정보' }, { key: 'guardianName', label: '보호자 이름' }, { key: 'phone', label: '보호자 전화번호' }, { key: 'consultant', label: '담당자' }, { key: 'completedDate', label: '입양완료일', type: 'date' }, { key: 'photoUpload', label: '사진첨부', type: 'file' }, { key: 'memo', label: '특이사항' }]
-const supplyFields = [{ key: 'date', label: '매입일', type: 'date' }, { key: 'vendor', label: '거래처' }, { key: 'itemType', label: '품목구분', options: itemTypes }, { key: 'summary', label: '매입내용' }, { key: 'totalAmount', label: '총매입금액', type: 'number' }, { key: 'paymentMethod', label: '결제수단' }, { key: 'status', label: '처리상태', options: processStatusList }, { key: 'receiptName', label: '영수증명' }, { key: 'receiptUpload', label: '영수증 첨부', type: 'file' }, { key: 'memo', label: '메모' }]
-const accountingFields = [{ key: 'date', label: '날짜', type: 'date' }, { key: 'type', label: '구분', options: ['수익', '비용'] }, { key: 'title', label: '항목명' }, { key: 'customerVendor', label: '고객/거래처' }, { key: 'dogName', label: '견명' }, { key: 'guardianName', label: '보호자 이름' }, { key: 'staff', label: '담당자' }, { key: 'amount', label: '금액', type: 'number' }, { key: 'paymentMethod', label: '결제수단' }, { key: 'status', label: '처리상태', options: processStatusList }, { key: 'settlementStatus', label: '정산상태', options: ['-', ...settlementStatusList] }, { key: 'receiptName', label: '영수증명' }, { key: 'receiptUpload', label: '영수증 첨부', type: 'file' }, { key: 'memo', label: '메모' }]
+const groomingFields = [{ key: 'dogName', label: '견명' }, { key: 'breed', label: '견종' }, { key: 'guardianName', label: '보호자 이름' }, { key: 'phone', label: '전화번호' }, { key: 'date', label: '예약날짜', type: 'date' }, { key: 'time', label: '예약시간', options: timeOptions }, { key: 'serviceType', label: '서비스유형', options: serviceTypes }, { key: 'options', label: '추가옵션', options: additionalOptions }, { key: 'price', label: '가격', type: 'number' }, { key: 'staff', label: '담당자', options: staffList }, { key: 'status', label: '진행상태', options: statusList }, { key: 'paymentStatus', label: '결제상태', options: paymentStatusList }, { key: 'paymentMethod', label: '결제조건' }, { key: 'memo', label: '메모' }]
+const puppyCreateFields = [{ key: 'arrival', label: '입소일', type: 'date' }, { key: 'name', label: '견명' }, { key: 'breed', label: '견종' }, { key: 'gender', label: '성별', options: genderOptions }, { key: 'birth', label: '생년월일', type: 'date' }, { key: 'coatColor', label: '모색' }, { key: 'source', label: '입소처' }, { key: 'intakeAmount', label: '도입가', type: 'number' }, { key: 'adoptionPrice', label: '입양가', type: 'number' }, { key: 'status', label: '현재상태', options: puppyStatusList }, { key: 'healthStatus', label: '건강상태' }, { key: 'vaccination', label: '접종정보' }, { key: 'memo', label: '특이사항' }, { key: 'photoUpload', label: '사진첨부', type: 'file' }]
+const puppyFields = [{ key: 'profileNo', label: '관리번호' }, { key: 'arrival', label: '입소일', type: 'date' }, { key: 'name', label: '견명' }, { key: 'breed', label: '견종' }, { key: 'gender', label: '성별', options: genderOptions }, { key: 'birth', label: '생년월일', type: 'date' }, { key: 'coatColor', label: '모색' }, { key: 'source', label: '입소처' }, { key: 'intakeAmount', label: '도입가', type: 'number' }, { key: 'adoptionPrice', label: '입양가', type: 'number' }, { key: 'status', label: '현재상태', options: puppyStatusList }, { key: 'healthStatus', label: '건강상태' }, { key: 'vaccination', label: '접종정보' }, { key: 'guardianName', label: '보호자 이름' }, { key: 'phone', label: '보호자 전화번호' }, { key: 'consultant', label: '담당자' }, { key: 'completedDate', label: '입양완료일', type: 'date' }, { key: 'photoUpload', label: '사진첨부', type: 'file' }, { key: 'memo', label: '특이사항' }]
+const supplyFields = [{ key: 'date', label: '매입일', type: 'date' }, { key: 'vendor', label: '납품업체명' }, { key: 'itemType', label: '품목구분', options: itemTypes }, { key: 'summary', label: '매입내용' }, { key: 'totalAmount', label: '총매입금액', type: 'number' }, { key: 'paymentMethod', label: '결제조건', options: supplyPaymentMethods }, { key: 'status', label: '처리상태', options: processStatusList }, { key: 'receiptName', label: '영수증명' }, { key: 'receiptUpload', label: '영수증 첨부', type: 'file' }, { key: 'memo', label: '메모' }]
+const supplyVendorFields = [{ key: 'name', label: '거래처명' }, { key: 'manager', label: '담당자명' }, { key: 'phone', label: '전화번호' }, { key: 'mainItem', label: '주 취급품목', options: itemTypes }, { key: 'paymentMethod', label: '결제조건', options: supplyPaymentMethods }, { key: 'memo', label: '메모' }]
+const accountingFields = [{ key: 'date', label: '날짜', type: 'date' }, { key: 'type', label: '구분', options: ['수익', '비용'] }, { key: 'title', label: '항목명' }, { key: 'customerVendor', label: '고객/거래처' }, { key: 'dogName', label: '견명' }, { key: 'guardianName', label: '보호자 이름' }, { key: 'staff', label: '담당자' }, { key: 'amount', label: '금액', type: 'number' }, { key: 'paymentMethod', label: '결제조건' }, { key: 'status', label: '처리상태', options: processStatusList }, { key: 'settlementStatus', label: '정산상태', options: ['-', ...settlementStatusList] }, { key: 'receiptName', label: '영수증명' }, { key: 'receiptUpload', label: '영수증 첨부', type: 'file' }, { key: 'memo', label: '메모' }]
 const settlementFields = [{ key: 'date', label: '날짜', type: 'date' }, { key: 'dogName', label: '견명' }, { key: 'guardianName', label: '보호자 이름' }, { key: 'salesAmount', label: '미용매출', type: 'number' }, { key: 'settlementAmount', label: '정산금액', type: 'number' }, { key: 'status', label: '정산상태', options: settlementStatusList }, { key: 'memo', label: '메모' }]
 
 export default App

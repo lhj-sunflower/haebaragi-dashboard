@@ -425,7 +425,8 @@ th {
   padding: 0 8px 5px;
   color: #7b4d2b;
   font-size: 12px;
-  text-align: left;
+  text-align: center;
+  vertical-align: middle;
   white-space: nowrap;
 }
 
@@ -2511,3 +2512,2058 @@ table th,
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Premium simplified workspace */
+.premiumHeader {
+  position: relative;
+  justify-content: center;
+  min-height: 58px;
+  padding: 4px 220px 8px;
+  text-align: center;
+  border-bottom: 1px solid rgba(122, 75, 42, 0.12);
+}
+
+.pageHeading {
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+}
+
+.pageHeading h1 {
+  font-size: 25px;
+  letter-spacing: 0;
+}
+
+.pageHeading > span {
+  color: #765035;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.premiumHeader .headerTools {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transform: translateY(-50%);
+}
+
+.premiumHeader .headerTools button {
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: #7a4b2a;
+  color: #fffaf0;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.groomingWorkspace {
+  gap: 10px;
+}
+
+.groomingSubTabs {
+  justify-content: center;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 244, 221, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(122, 75, 42, 0.1);
+}
+
+.groomingSubTabs button {
+  min-width: 148px;
+  min-height: 34px;
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 13px;
+}
+
+.careBoard {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.careStaffCard {
+  min-height: calc(100vh - 170px);
+  padding: 14px;
+  overflow: hidden;
+}
+
+.careStaffCard .panelTitle {
+  margin-bottom: 9px;
+}
+
+.careCardList {
+  display: grid;
+  gap: 8px;
+  max-height: calc(100vh - 230px);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.careReservationCard {
+  width: 100%;
+  display: grid;
+  gap: 5px;
+  padding: 10px 12px;
+  border: 1px solid rgba(122, 75, 42, 0.13);
+  border-radius: 16px;
+  color: #332016;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 9px 20px rgba(74, 45, 31, 0.09);
+}
+
+.careReservationCard:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 13px 26px rgba(74, 45, 31, 0.15);
+}
+
+.careCardTop,
+.careReservationCard footer,
+.carePetLine,
+.careDayMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.careCardTop strong {
+  font-size: 20px;
+  color: #3a261c;
+}
+
+.carePetLine b {
+  font-size: 16px;
+}
+
+.carePetLine em,
+.careReservationCard p,
+.careReservationCard footer small {
+  color: #674229;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.careReservationCard p {
+  white-space: normal;
+  word-break: keep-all;
+}
+
+.careReservationCard footer span {
+  color: #3a261c;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.statusPill,
+.staffBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.status-waiting { background: #eee7dd; color: #67574b; }
+.status-confirmed { background: #d2a15c; color: #3a261c; }
+.status-active { background: #e7b44d; color: #3a261c; }
+.status-done { background: #c5d0ad; color: #344126; }
+.status-cancelled { background: #d9cbc2; color: #77584a; }
+
+.groomingToolbar {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 12px 14px;
+}
+
+.groomingToolbar p {
+  color: #765035;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.groomingReservationPanel .groomingFilterBar {
+  grid-template-columns: minmax(130px, 1.2fr) 118px 118px 112px 120px;
+  gap: 7px;
+  align-items: end;
+}
+
+.groomingReservationPanel .field span {
+  font-size: 11px;
+}
+
+.groomingReservationPanel .field input,
+.groomingReservationPanel .field select {
+  min-height: 32px;
+  padding: 5px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.groomingReservationPanel table {
+  table-layout: fixed;
+}
+
+.groomingReservationPanel th,
+.groomingReservationPanel td {
+  padding: 5px 4px;
+  font-size: 10.5px;
+  line-height: 1.18;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.groomingReservationPanel th:nth-child(3),
+.groomingReservationPanel td:nth-child(3),
+.groomingReservationPanel th:nth-child(4),
+.groomingReservationPanel td:nth-child(4),
+.groomingReservationPanel th:nth-child(5),
+.groomingReservationPanel td:nth-child(5) {
+  font-size: 10px;
+}
+
+.groomingReservationPanel td {
+  white-space: normal;
+  word-break: keep-all;
+  overflow: hidden;
+  display: table-cell;
+  -webkit-line-clamp: 2;
+}
+
+.careCalendarPanel {
+  padding: 12px;
+}
+
+.careCalendarGrid {
+  gap: 5px;
+}
+
+.careCalendarDay {
+  min-height: 86px;
+  padding: 7px;
+}
+
+.careCalendarDay strong {
+  margin-bottom: 3px;
+  font-size: 15px;
+}
+
+.careCalendarItem {
+  margin-top: 2px;
+  padding: 2px 4px;
+  border-radius: 7px;
+  font-size: 10.5px !important;
+  line-height: 1.15 !important;
+}
+
+.careCalendarItem.director,
+.staffBadge.director {
+  background: #c28b4c;
+  color: #fffaf0;
+}
+
+.careCalendarItem.yesul,
+.staffBadge.yesul {
+  background: #ead0c4;
+  color: #5b3625;
+}
+
+.careDayModal {
+  gap: 7px;
+}
+
+.careDayLine {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.careDayMeta {
+  min-width: 170px;
+  justify-content: flex-end;
+}
+
+.careDayMeta b,
+.careDayMeta em {
+  color: #3a261c;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 950;
+}
+
+th {
+  text-align: center;
+  vertical-align: middle;
+  font-weight: 900;
+}
+
+@media (max-width: 1280px) {
+  .premiumHeader {
+    padding-right: 190px;
+    padding-left: 190px;
+  }
+
+  .pageHeading h1 {
+    font-size: 22px;
+  }
+
+  .pageHeading > span {
+    font-size: 11px;
+  }
+
+  .groomingSubTabs button {
+    min-width: 132px;
+    padding-inline: 12px;
+  }
+
+  .careStaffCard {
+    min-height: calc(100vh - 164px);
+  }
+}
+
+@media (max-width: 1040px) {
+  .premiumHeader {
+    justify-content: flex-start;
+    padding: 0 0 8px;
+    text-align: left;
+  }
+
+  .premiumHeader .headerTools {
+    position: static;
+    transform: none;
+    margin-left: auto;
+  }
+
+  .pageHeading {
+    justify-items: start;
+  }
+
+  .careBoard {
+    grid-template-columns: 1fr;
+  }
+
+  .groomingReservationPanel .groomingFilterBar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+
+/* Compact data alignment and quick edit controls */
+.quickStatusPanel {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(122, 75, 42, 0.14);
+  border-radius: 14px;
+  background: #fff4dd;
+}
+
+.quickStatusPanel h3 {
+  margin: 0;
+  color: #5d3824;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.quickButtonGroup {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.quickButtonGroup button {
+  min-height: 32px;
+  padding: 6px 7px;
+  border-radius: 999px;
+  background: #f3dfbf;
+  color: #5d3824;
+  font-size: 11px;
+  font-weight: 950;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.quickButtonGroup button.selected,
+.quickButtonGroup button:hover {
+  background: #7a4b2a;
+  color: #fffaf0;
+}
+
+.paymentQuickPanel {
+  background: #fffaf0;
+}
+
+.paymentButtons button.selected {
+  background: #c28b4c;
+}
+
+.field input[inputmode="numeric"] {
+  font-variant-numeric: tabular-nums;
+}
+
+table th,
+table td {
+  vertical-align: middle !important;
+}
+
+td.col-date,
+td.col-time,
+td.col-status,
+td.col-staff,
+td.col-consultant,
+td.col-paymentStatus,
+td.col-price,
+td.col-amount,
+td.col-totalAmount,
+td.col-finalPrice,
+td.col-intakeAmount,
+td.col-adoptionPrice,
+td.col-budget,
+td.col-phone,
+td.col-visitDate,
+td.col-completedDate,
+td.col-arrival,
+td.col-gender,
+td.col-ageMonths,
+td.col-mainItem,
+td.col-paymentMethod {
+  text-align: center !important;
+}
+
+td.col-price,
+td.col-amount,
+td.col-totalAmount,
+td.col-finalPrice,
+td.col-intakeAmount,
+td.col-adoptionPrice,
+td.col-budget {
+  font-size: 11.5px !important;
+  font-weight: 950 !important;
+  white-space: nowrap !important;
+}
+
+td.col-dogName,
+td.col-name,
+td.col-guardianName,
+td.col-vendor,
+td.col-title,
+td.col-serviceType,
+td.col-options,
+td.col-summary,
+td.col-memo,
+td.col-customerVendor,
+td.col-region,
+td.col-preferredBreed {
+  text-align: left !important;
+}
+
+.supplyWorkspace .compactPanel table {
+  table-layout: fixed;
+}
+
+.supplyWorkspace .compactPanel th,
+.supplyWorkspace .compactPanel td {
+  padding: 5px 6px !important;
+  font-size: 11px !important;
+  line-height: 1.18;
+}
+
+.supplyWorkspace .compactPanel th:nth-child(1),
+.supplyWorkspace .compactPanel td:nth-child(1) { width: 24%; }
+.supplyWorkspace .compactPanel th:nth-child(2),
+.supplyWorkspace .compactPanel td:nth-child(2) { width: 16%; }
+.supplyWorkspace .compactPanel th:nth-child(3),
+.supplyWorkspace .compactPanel td:nth-child(3) { width: 18%; white-space: nowrap; }
+.supplyWorkspace .compactPanel th:nth-child(4),
+.supplyWorkspace .compactPanel td:nth-child(4) { width: 18%; }
+.supplyWorkspace .compactPanel th:nth-child(5),
+.supplyWorkspace .compactPanel td:nth-child(5) { width: 18%; }
+
+.compactPanel.puppyAdoptionPanel th,
+.compactPanel.puppyAdoptionPanel td,
+.puppyAdoptionPanel th,
+.puppyAdoptionPanel td {
+  padding: 3px 3px !important;
+  font-size: 10.5px !important;
+  line-height: 1.16 !important;
+  vertical-align: middle !important;
+}
+
+.puppyAdoptionPanel table {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+
+.puppyAdoptionPanel th:nth-child(1), .puppyAdoptionPanel td:nth-child(1) { width: 8.5% !important; }
+.puppyAdoptionPanel th:nth-child(2), .puppyAdoptionPanel td:nth-child(2) { width: 8.5% !important; }
+.puppyAdoptionPanel th:nth-child(3), .puppyAdoptionPanel td:nth-child(3) { width: 5.5% !important; text-align: center !important; }
+.puppyAdoptionPanel th:nth-child(4), .puppyAdoptionPanel td:nth-child(4) { width: 6% !important; text-align: center !important; }
+.puppyAdoptionPanel th:nth-child(5), .puppyAdoptionPanel td:nth-child(5) { width: 13% !important; white-space: nowrap !important; }
+.puppyAdoptionPanel th:nth-child(6), .puppyAdoptionPanel td:nth-child(6) { width: 13% !important; white-space: nowrap !important; }
+.puppyAdoptionPanel th:nth-child(7), .puppyAdoptionPanel td:nth-child(7) { width: 10% !important; white-space: nowrap !important; text-align: center !important; }
+.puppyAdoptionPanel th:nth-child(8), .puppyAdoptionPanel td:nth-child(8) { width: 9% !important; }
+.puppyAdoptionPanel th:nth-child(9), .puppyAdoptionPanel td:nth-child(9) { width: 15% !important; white-space: nowrap !important; }
+.puppyAdoptionPanel th:nth-child(10), .puppyAdoptionPanel td:nth-child(10) { width: 11.5% !important; text-align: center !important; }
+
+.puppyAdoptionPanel td:nth-child(1),
+.puppyAdoptionPanel td:nth-child(2),
+.puppyAdoptionPanel td:nth-child(8),
+.puppyAdoptionPanel td:nth-child(10) {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal !important;
+}
+
+.compactPanel table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modalCard .detailGrid,
+.modalCard .bookingFlow .detailGrid,
+.modalCard .editArea .detailGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1120px) {
+  .quickButtonGroup {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .modalCard .detailGrid,
+  .modalCard .bookingFlow .detailGrid,
+  .modalCard .editArea .detailGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+
+/* Final compact care cards and stable table alignment */
+.careStaffCard {
+  padding: 10px 11px !important;
+}
+
+.careCardList {
+  gap: 4px !important;
+  max-height: calc(100vh - 205px) !important;
+}
+
+.compactCareCard {
+  min-height: 30px !important;
+  grid-template-columns: 42px minmax(48px, 0.9fr) minmax(42px, 0.8fr) minmax(44px, 0.8fr) minmax(58px, 0.9fr) 10px;
+  align-items: center;
+  gap: 5px !important;
+  padding: 5px 7px !important;
+  border-left: 4px solid rgba(122, 75, 42, 0.38) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 5px 12px rgba(74, 45, 31, 0.08) !important;
+}
+
+.compactCareCard.status-waiting { border-left-color: #a99b8b !important; }
+.compactCareCard.status-confirmed { border-left-color: #9a6334 !important; }
+.compactCareCard.status-active { border-left-color: #d79a26 !important; }
+.compactCareCard.status-done { border-left-color: #7f9167 !important; }
+.compactCareCard.status-cancelled { border-left-color: #a98778 !important; }
+
+.compactCareCard .compactCareTime,
+.compactCareCard strong,
+.compactCareCard span,
+.compactCareCard b {
+  min-width: 0;
+  overflow: hidden;
+  color: #332016;
+  font-size: 11.5px;
+  line-height: 1.15;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compactCareCard .compactCareTime {
+  color: #7a4b2a;
+  font-variant-numeric: tabular-nums;
+}
+
+.compactCareCard b {
+  color: #5d3824;
+  text-align: center;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  justify-self: end;
+}
+
+.statusDot.status-waiting { background: #a99b8b; }
+.statusDot.status-confirmed { background: #9a6334; }
+.statusDot.status-active { background: #d79a26; }
+.statusDot.status-done { background: #7f9167; }
+.statusDot.status-cancelled { background: #a98778; }
+
+table {
+  table-layout: fixed !important;
+}
+
+table th,
+table td,
+.statsTable th,
+.statsTable td,
+.crmHistoryTable th,
+.crmHistoryTable td,
+.reservationPanel th,
+.reservationPanel td,
+.compactPanel th,
+.compactPanel td,
+.puppyProfilePanel th,
+.puppyProfilePanel td,
+.puppyAdoptionPanel th,
+.puppyAdoptionPanel td {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+table td,
+.compactPanel td,
+.reservationPanel td,
+.crmHistoryTable td,
+.statsTable td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+td.col-price,
+td.col-amount,
+td.col-totalAmount,
+td.col-salesAmount,
+td.col-settlementAmount,
+td.col-income,
+td.col-expense,
+td.col-profit,
+td.col-finalPrice,
+td.col-intakeAmount,
+td.col-adoptionPrice,
+td.col-budget,
+.statsTable td:nth-child(10),
+.crmHistoryTable td:nth-child(6) {
+  text-align: left !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap !important;
+}
+
+td.col-phone,
+td.col-date,
+td.col-arrival,
+td.col-completedDate,
+td.col-visitDate,
+td.col-time {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap !important;
+}
+
+.puppyAdoptionPanel .tableWrap {
+  overflow-x: hidden !important;
+}
+
+.puppyAdoptionPanel table {
+  min-width: 0 !important;
+  width: 100% !important;
+  table-layout: fixed !important;
+  border-spacing: 0 2px !important;
+}
+
+.puppyAdoptionPanel th,
+.puppyAdoptionPanel td {
+  padding: 2px 2px !important;
+  font-size: 10px !important;
+  line-height: 1.12 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+
+.puppyAdoptionPanel th:nth-child(1), .puppyAdoptionPanel td:nth-child(1) { width: 8% !important; }
+.puppyAdoptionPanel th:nth-child(2), .puppyAdoptionPanel td:nth-child(2) { width: 8% !important; }
+.puppyAdoptionPanel th:nth-child(3), .puppyAdoptionPanel td:nth-child(3) { width: 5% !important; }
+.puppyAdoptionPanel th:nth-child(4), .puppyAdoptionPanel td:nth-child(4) { width: 6% !important; }
+.puppyAdoptionPanel th:nth-child(5), .puppyAdoptionPanel td:nth-child(5) { width: 13% !important; }
+.puppyAdoptionPanel th:nth-child(6), .puppyAdoptionPanel td:nth-child(6) { width: 13% !important; }
+.puppyAdoptionPanel th:nth-child(7), .puppyAdoptionPanel td:nth-child(7) { width: 9.5% !important; text-align: left !important; }
+.puppyAdoptionPanel th:nth-child(8), .puppyAdoptionPanel td:nth-child(8) { width: 9% !important; }
+.puppyAdoptionPanel th:nth-child(9), .puppyAdoptionPanel td:nth-child(9) { width: 15% !important; }
+.puppyAdoptionPanel th:nth-child(10), .puppyAdoptionPanel td:nth-child(10) { width: 13.5% !important; }
+
+.puppyAdoptionPanel td:nth-child(1),
+.puppyAdoptionPanel td:nth-child(2),
+.puppyAdoptionPanel td:nth-child(8),
+.puppyAdoptionPanel td:nth-child(10) {
+  display: table-cell !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.modalCard {
+  max-height: 80vh !important;
+}
+
+.modalCard > .detailGrid,
+.modalCard > .editArea,
+.modalCard > .bookingFlow {
+  overflow-y: auto !important;
+}
+
+.modalActions {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 2;
+}
+
+
+/* Settlement compact and puppy matching form */
+.settlementMetrics {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+  margin-bottom: 6px;
+}
+
+.settlementMetrics .summaryCard {
+  min-height: 52px !important;
+  padding: 6px 8px !important;
+  border-radius: 12px !important;
+}
+
+.settlementMetrics .summaryCard span {
+  font-size: 10px !important;
+  line-height: 1.1;
+}
+
+.settlementMetrics .summaryCard strong {
+  margin-top: 3px;
+  font-size: 15px !important;
+  line-height: 1.05;
+  text-align: left;
+}
+
+.settlementFilter {
+  grid-template-columns: 130px 130px auto auto !important;
+  gap: 6px !important;
+  margin-bottom: 6px !important;
+}
+
+.settlementFilter .field input,
+.settlementFilter button {
+  min-height: 30px !important;
+  padding: 5px 8px !important;
+  border-radius: 10px !important;
+  font-size: 11px !important;
+}
+
+.adoptionMatchForm {
+  gap: 8px !important;
+}
+
+.adoptionDogInfo,
+.adoptionOwnerInfo,
+.adoptionConsultInfo {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(122, 75, 42, 0.14);
+  border-radius: 14px;
+  background: #fff4dd;
+}
+
+.adoptionOwnerInfo,
+.adoptionConsultInfo {
+  background: #fffaf0;
+}
+
+.adoptionDogInfo h3,
+.adoptionOwnerInfo h3,
+.adoptionConsultInfo h3 {
+  margin: 0;
+  color: #5d3824;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.adoptionDogInfo .panelTitle {
+  margin: 0;
+}
+
+.adoptionDogInfo .primaryAction {
+  min-height: 30px;
+  padding: 5px 10px;
+  font-size: 11px;
+}
+
+.dogInfoGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.dogInfoGrid .crmInfoCard {
+  min-height: 48px;
+  padding: 7px 8px;
+  border-radius: 10px;
+}
+
+.dogInfoGrid .crmInfoCard span {
+  font-size: 10px;
+}
+
+.dogInfoGrid .crmInfoCard strong {
+  font-size: 12px;
+}
+
+.puppyPickerList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.puppyPickerList button {
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px;
+  border-radius: 10px;
+  background: #f3dfbf;
+  color: #332016;
+  text-align: left;
+  cursor: pointer;
+}
+
+.puppyPickerList button:hover {
+  background: #e6bf86;
+}
+
+.puppyPickerList strong,
+.puppyPickerList span {
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adoptionMatchForm .detailGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 5px !important;
+}
+
+.adoptionMatchForm .field input,
+.adoptionMatchForm .field select {
+  min-height: 31px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.adoptionMatchForm .modalActions {
+  margin-top: 0;
+}
+
+@media (max-width: 1180px) {
+  .settlementMetrics .summaryCard strong {
+    font-size: 13px !important;
+  }
+
+  .dogInfoGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+
+/* Final table header and amount alignment enforcement */
+table th,
+.tableWrap table th,
+.statsTable th,
+.crmHistoryTable th,
+.reservationPanel th,
+.compactPanel th,
+.puppyProfilePanel th,
+.puppyAdoptionPanel th {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+table td,
+.tableWrap table td,
+.statsTable td,
+.crmHistoryTable td,
+.reservationPanel td,
+.compactPanel td,
+.puppyProfilePanel td,
+.puppyAdoptionPanel td {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+td.col-price,
+td.col-amount,
+td.col-totalAmount,
+td.col-salesAmount,
+td.col-settlementAmount,
+td.col-income,
+td.col-expense,
+td.col-profit,
+td.col-finalPrice,
+td.col-intakeAmount,
+td.col-adoptionPrice,
+td.col-budget,
+.tableWrap table td.col-price,
+.tableWrap table td.col-amount,
+.tableWrap table td.col-totalAmount,
+.tableWrap table td.col-salesAmount,
+.tableWrap table td.col-settlementAmount,
+.tableWrap table td.col-income,
+.tableWrap table td.col-expense,
+.tableWrap table td.col-profit,
+.tableWrap table td.col-finalPrice,
+.tableWrap table td.col-intakeAmount,
+.tableWrap table td.col-adoptionPrice,
+.tableWrap table td.col-budget,
+.statsTable td:nth-child(10),
+.crmHistoryTable td:nth-child(6) {
+  text-align: left !important;
+}
+
+.textAreaField textarea {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+  border: 2px solid #e6d0ad;
+  border-radius: 11px;
+  padding: 7px 9px;
+  background: #fffaf0;
+  color: #3a261c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* 2026 운영 정리: 모든 헤더/본문 기본 중앙, 숫자 데이터만 오른쪽 정렬 */
+table th,
+.tableWrap table th,
+.statsTable th,
+.crmHistoryTable th,
+.reservationPanel th,
+.compactPanel th,
+.puppyProfilePanel th,
+.puppyAdoptionPanel th {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+table td,
+.tableWrap table td,
+.statsTable td,
+.crmHistoryTable td,
+.reservationPanel td,
+.compactPanel td,
+.puppyProfilePanel td,
+.puppyAdoptionPanel td {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+td.col-price,
+td.col-amount,
+td.col-totalAmount,
+td.col-salesAmount,
+td.col-settlementAmount,
+td.col-income,
+td.col-expense,
+td.col-profit,
+td.col-finalPrice,
+td.col-intakeAmount,
+td.col-adoptionPrice,
+td.col-budget,
+td.col-ageMonths,
+td.col-quantity,
+td.col-count,
+.tableWrap table td.col-price,
+.tableWrap table td.col-amount,
+.tableWrap table td.col-totalAmount,
+.tableWrap table td.col-salesAmount,
+.tableWrap table td.col-settlementAmount,
+.tableWrap table td.col-income,
+.tableWrap table td.col-expense,
+.tableWrap table td.col-profit,
+.tableWrap table td.col-finalPrice,
+.tableWrap table td.col-intakeAmount,
+.tableWrap table td.col-adoptionPrice,
+.tableWrap table td.col-budget,
+.tableWrap table td.col-ageMonths,
+.tableWrap table td.col-quantity,
+.tableWrap table td.col-count,
+.statsTable td:nth-child(10),
+.crmHistoryTable td:nth-child(6) {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap !important;
+}
+
+.multiSelectField {
+  gap: 5px;
+}
+
+.multiSelectOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.multiSelectOptions button {
+  border: 1px solid #d9bd91;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #fffaf0;
+  color: #5d3824;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.multiSelectOptions button.selected {
+  border-color: #8a552e;
+  background: #8a552e;
+  color: #fffaf0;
+}
+
+/* 2026 UI stability pass: unified premium spacing, controls, tables, modals */
+:root {
+  --ui-ivory: #fffaf0;
+  --ui-cream: #f7ecd8;
+  --ui-beige: #ead6b6;
+  --ui-camel: #b98245;
+  --ui-brown: #4d3020;
+  --ui-line: rgba(122, 75, 42, 0.16);
+}
+
+.panel,
+.summaryCard,
+.crmInfoCard,
+.careStaffCard,
+.adoptionDogInfo,
+.adoptionOwnerInfo,
+.quickStatusPanel,
+.modalCard {
+  border: 1px solid var(--ui-line) !important;
+  border-radius: 14px !important;
+  background: var(--ui-ivory) !important;
+  box-shadow: 0 10px 24px rgba(74, 45, 31, 0.08) !important;
+}
+
+.panel {
+  min-height: 0 !important;
+  padding: 10px 12px !important;
+}
+
+.stack,
+.groomingWorkspace,
+.supplyWorkspace,
+.statsAdmin,
+.adoptionMatchForm {
+  gap: 10px !important;
+}
+
+.panelTitle,
+.compactToolbar,
+.modalHeader {
+  gap: 8px !important;
+  align-items: center !important;
+}
+
+.panelTitle h2,
+.compactToolbar h2,
+.modalHeader h2 {
+  color: var(--ui-brown) !important;
+  text-align: center !important;
+}
+
+.field {
+  min-width: 0 !important;
+  gap: 5px !important;
+}
+
+.field span,
+.detailGrid dt {
+  color: #6e472f !important;
+  font-size: 10.5px !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+}
+
+.field input,
+.field select,
+.field textarea,
+.textAreaField textarea {
+  min-height: 32px !important;
+  border: 1px solid #dec49f !important;
+  border-radius: 10px !important;
+  padding: 6px 8px !important;
+  background: #fffdf7 !important;
+  color: var(--ui-brown) !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+.textAreaField textarea {
+  min-height: 58px !important;
+}
+
+.choiceSelectField,
+.multiSelectField {
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+.optionButtonGroup,
+.multiSelectOptions {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 5px !important;
+  width: 100%;
+}
+
+.optionButtonGroup button,
+.multiSelectOptions button {
+  min-height: 31px !important;
+  border: 1px solid #d9bd91 !important;
+  border-radius: 999px !important;
+  padding: 5px 7px !important;
+  background: #fff7e8 !important;
+  color: #5d3824 !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.optionButtonGroup button.selected,
+.multiSelectOptions button.selected {
+  border-color: #8a552e !important;
+  background: #8a552e !important;
+  color: #fffaf0 !important;
+}
+
+.bookingFlow .detailGrid,
+.editArea .detailGrid,
+.modalCard .detailGrid {
+  gap: 6px !important;
+}
+
+.detailGrid div,
+.detailGrid label,
+.detailGrid .field {
+  min-width: 0 !important;
+}
+
+.detailGrid div {
+  padding: 8px !important;
+  border-radius: 11px !important;
+  background: #f5e4c8 !important;
+}
+
+.detailGrid dd {
+  color: var(--ui-brown) !important;
+  text-align: center !important;
+  overflow-wrap: anywhere;
+}
+
+.modalCard {
+  width: min(760px, calc(100vw - 32px)) !important;
+  max-height: 80vh !important;
+  overflow: hidden !important;
+  padding: 12px !important;
+}
+
+.modalCard > .modalList,
+.modalCard > .detailGrid,
+.modalCard > .bookingFlow,
+.modalCard > .editArea {
+  min-height: 0 !important;
+  max-height: calc(80vh - 86px) !important;
+  overflow-y: auto !important;
+  padding-right: 4px !important;
+}
+
+.modalActions {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 3 !important;
+  margin-top: 8px !important;
+  padding: 8px 0 0 !important;
+  background: linear-gradient(180deg, rgba(255, 250, 240, 0.78), #fffaf0 45%) !important;
+}
+
+table,
+.tableWrap table,
+.statsTable,
+.crmHistoryTable {
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+
+table th,
+.tableWrap table th,
+.statsTable th,
+.crmHistoryTable th,
+.reservationPanel th,
+.compactPanel th,
+.puppyProfilePanel th,
+.puppyAdoptionPanel th {
+  text-align: center !important;
+  vertical-align: middle !important;
+  font-weight: 900 !important;
+}
+
+table td,
+.tableWrap table td,
+.statsTable td,
+.crmHistoryTable td,
+.reservationPanel td,
+.compactPanel td,
+.puppyProfilePanel td,
+.puppyAdoptionPanel td {
+  text-align: center !important;
+  vertical-align: middle !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+td.col-price,
+td.col-amount,
+td.col-totalAmount,
+td.col-salesAmount,
+td.col-settlementAmount,
+td.col-income,
+td.col-expense,
+td.col-profit,
+td.col-finalPrice,
+td.col-intakeAmount,
+td.col-adoptionPrice,
+td.col-budget,
+td.col-ageMonths,
+td.col-quantity,
+td.col-count,
+.tableWrap table td.col-price,
+.tableWrap table td.col-amount,
+.tableWrap table td.col-totalAmount,
+.tableWrap table td.col-salesAmount,
+.tableWrap table td.col-settlementAmount,
+.tableWrap table td.col-income,
+.tableWrap table td.col-expense,
+.tableWrap table td.col-profit,
+.tableWrap table td.col-finalPrice,
+.tableWrap table td.col-intakeAmount,
+.tableWrap table td.col-adoptionPrice,
+.tableWrap table td.col-budget,
+.tableWrap table td.col-ageMonths,
+.crmHistoryTable td:nth-child(5),
+.statsTable td:nth-child(10) {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+.crmHistoryTable th,
+.crmHistoryTable td {
+  padding: 4px 4px !important;
+  font-size: 10.4px !important;
+}
+
+.crmHistoryTable th:nth-child(1), .crmHistoryTable td:nth-child(1) { width: 124px !important; }
+.crmHistoryTable th:nth-child(2), .crmHistoryTable td:nth-child(2) { width: 70px !important; }
+.crmHistoryTable th:nth-child(3), .crmHistoryTable td:nth-child(3) { width: 62px !important; }
+.crmHistoryTable th:nth-child(4), .crmHistoryTable td:nth-child(4) { width: 20% !important; }
+.crmHistoryTable th:nth-child(5), .crmHistoryTable td:nth-child(5) { width: 82px !important; }
+.crmHistoryTable th:nth-child(6), .crmHistoryTable td:nth-child(6) { width: 72px !important; }
+.crmHistoryTable th:nth-child(7), .crmHistoryTable td:nth-child(7) { width: auto !important; }
+
+.supplyWorkspace .panel:last-child .panelTitle h2::after {
+  content: '';
+}
+
+.puppyAdoptionPanel td.col-finalPrice,
+.puppyProfilePanel td.col-intakeAmount,
+.puppyProfilePanel td.col-adoptionPrice {
+  text-align: right !important;
+}
+
+@media (max-width: 1120px) {
+  .optionButtonGroup,
+  .multiSelectOptions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .modalCard {
+    width: calc(100vw - 24px) !important;
+  }
+}
+
+/* Final puppy matching picker popup */
+.innerPickerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(47, 30, 20, 0.28);
+}
+
+.innerPickerCard {
+  width: min(720px, calc(100vw - 36px));
+  max-height: 76vh;
+  overflow: hidden;
+  border: 1px solid rgba(122, 75, 42, 0.18);
+  border-radius: 16px;
+  background: #fffaf0;
+  box-shadow: 0 22px 50px rgba(47, 30, 20, 0.24);
+  padding: 12px;
+}
+
+.innerPickerCard .panelTitle {
+  margin-bottom: 8px;
+}
+
+.innerPickerCard .panelTitle button {
+  min-height: 30px;
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: #7a4b2a;
+  color: #fffaf0;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.puppySelectTableWrap {
+  max-height: calc(76vh - 72px);
+  overflow-y: auto;
+}
+
+.puppySelectTable {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.puppySelectTable th,
+.puppySelectTable td {
+  padding: 6px 5px !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  font-size: 11px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.puppySelectTable td:nth-child(5) {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.puppySelectTable tbody tr {
+  cursor: pointer;
+}
+
+.puppySelectTable tbody tr:hover {
+  background: #f1d7ad;
+}
+
+.puppySelectTable th:nth-child(1), .puppySelectTable td:nth-child(1) { width: 15%; }
+.puppySelectTable th:nth-child(2), .puppySelectTable td:nth-child(2) { width: 15%; }
+.puppySelectTable th:nth-child(3), .puppySelectTable td:nth-child(3) { width: 12%; }
+.puppySelectTable th:nth-child(4), .puppySelectTable td:nth-child(4) { width: 10%; }
+.puppySelectTable th:nth-child(5), .puppySelectTable td:nth-child(5) { width: 16%; }
+.puppySelectTable th:nth-child(6), .puppySelectTable td:nth-child(6) { width: 32%; }
+
+/* Final unified table alignment pass */
+table,
+.tableWrap table,
+.statsTable,
+.crmHistoryTable,
+.puppySelectTable {
+  width: 100% !important;
+  table-layout: fixed !important;
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+}
+
+thead th,
+tbody td,
+table th,
+table td,
+.tableWrap table th,
+.tableWrap table td,
+.statsTable th,
+.statsTable td,
+.crmHistoryTable th,
+.crmHistoryTable td,
+.puppySelectTable th,
+.puppySelectTable td,
+.reservationPanel th,
+.reservationPanel td,
+.compactPanel th,
+.compactPanel td,
+.puppyProfilePanel th,
+.puppyProfilePanel td,
+.puppyAdoptionPanel th,
+.puppyAdoptionPanel td {
+  padding: 8px 6px !important;
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+  vertical-align: middle !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+table th,
+thead th,
+.tableWrap table th,
+.statsTable th,
+.crmHistoryTable th,
+.puppySelectTable th,
+.reservationPanel th,
+.compactPanel th,
+.puppyProfilePanel th,
+.puppyAdoptionPanel th {
+  text-align: center !important;
+  font-weight: 600 !important;
+}
+
+table td,
+tbody td,
+.tableWrap table td,
+.statsTable td,
+.crmHistoryTable td,
+.puppySelectTable td,
+.reservationPanel td,
+.compactPanel td,
+.puppyProfilePanel td,
+.puppyAdoptionPanel td {
+  text-align: center !important;
+}
+
+td.number,
+.tableWrap table td.number,
+.statsTable td.number,
+.crmHistoryTable td.number,
+.puppySelectTable td.number,
+td.col-price,
+td.col-amount,
+td.col-totalAmount,
+td.col-salesAmount,
+td.col-settlementAmount,
+td.col-income,
+td.col-expense,
+td.col-profit,
+td.col-finalPrice,
+td.col-intakeAmount,
+td.col-adoptionPrice,
+td.col-budget,
+td.col-ageMonths,
+td.col-quantity,
+td.col-count,
+td.col-adoptionAmount,
+td.col-purchasePrice,
+.puppySelectTable td:nth-child(3),
+.puppySelectTable td:nth-child(5),
+.crmHistoryTable td:nth-child(5),
+.statsTable td:nth-child(10) {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+th.number,
+.tableWrap table th.number,
+.statsTable th.number,
+.crmHistoryTable th.number,
+.puppySelectTable th.number,
+th.col-price,
+th.col-amount,
+th.col-totalAmount,
+th.col-salesAmount,
+th.col-settlementAmount,
+th.col-income,
+th.col-expense,
+th.col-profit,
+th.col-finalPrice,
+th.col-intakeAmount,
+th.col-adoptionPrice,
+th.col-budget,
+th.col-ageMonths,
+th.col-quantity,
+th.col-count,
+th.col-adoptionAmount,
+th.col-purchasePrice {
+  text-align: center !important;
+}
+
+.col-dogName,
+.col-name,
+.col-petName,
+.col-puppyName { width: 12% !important; }
+.col-breed { width: 10% !important; }
+.col-gender { width: 8% !important; }
+.col-ageMonths { width: 8% !important; }
+.col-guardianName,
+.col-ownerName { width: 12% !important; }
+.col-phone,
+.col-ownerPhone { width: 14% !important; }
+.col-region { width: 10% !important; }
+.col-paymentMethod { width: 10% !important; }
+.col-price,
+.col-adoptionPrice,
+.col-finalPrice,
+.col-intakeAmount,
+.col-purchasePrice,
+.col-totalAmount,
+.col-amount,
+.col-salesAmount,
+.col-settlementAmount,
+.col-income,
+.col-expense,
+.col-profit,
+.col-budget { width: 10% !important; }
+.col-adoptionDate,
+.col-date,
+.col-arrival,
+.col-completedDate,
+.col-visitDate,
+.col-createdAt,
+.col-updatedAt { width: 12% !important; }
+.col-status,
+.col-paymentStatus,
+.col-settlementStatus { width: 8% !important; }
+.col-time { width: 8% !important; }
+.col-staff,
+.col-consultant,
+.col-manager { width: 9% !important; }
+.col-serviceType,
+.col-options,
+.col-itemType,
+.col-mainItem { width: 10% !important; }
+.col-memo,
+.col-specialNote,
+.col-summary,
+.col-title,
+.col-service { width: 14% !important; }
+.col-vendor,
+.col-supplierName,
+.col-vendorName,
+.col-customerVendor { width: 12% !important; }
+
+/* Puppy adoption history 12-column width override */
+.puppyAdoptionPanel table {
+  width: 100% !important;
+  table-layout: fixed !important;
+  border-collapse: collapse !important;
+}
+
+.puppyAdoptionPanel th,
+.puppyAdoptionPanel td {
+  padding: 6px 4px !important;
+  font-size: 11px !important;
+  line-height: 1.18 !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.puppyAdoptionPanel th:nth-child(1), .puppyAdoptionPanel td:nth-child(1) { width: 8% !important; }
+.puppyAdoptionPanel th:nth-child(2), .puppyAdoptionPanel td:nth-child(2) { width: 7% !important; }
+.puppyAdoptionPanel th:nth-child(3), .puppyAdoptionPanel td:nth-child(3) { width: 5% !important; }
+.puppyAdoptionPanel th:nth-child(4), .puppyAdoptionPanel td:nth-child(4) { width: 6% !important; }
+.puppyAdoptionPanel th:nth-child(5), .puppyAdoptionPanel td:nth-child(5) { width: 8% !important; }
+.puppyAdoptionPanel th:nth-child(6), .puppyAdoptionPanel td:nth-child(6) { width: 11% !important; }
+.puppyAdoptionPanel th:nth-child(7), .puppyAdoptionPanel td:nth-child(7) { width: 7% !important; }
+.puppyAdoptionPanel th:nth-child(8), .puppyAdoptionPanel td:nth-child(8) { width: 8% !important; }
+.puppyAdoptionPanel th:nth-child(9), .puppyAdoptionPanel td:nth-child(9) { width: 8% !important; }
+.puppyAdoptionPanel th:nth-child(10), .puppyAdoptionPanel td:nth-child(10) { width: 8% !important; }
+.puppyAdoptionPanel th:nth-child(11), .puppyAdoptionPanel td:nth-child(11) { width: 10% !important; }
+.puppyAdoptionPanel th:nth-child(12), .puppyAdoptionPanel td:nth-child(12) { width: 7% !important; }
+.puppyAdoptionPanel th:nth-child(13), .puppyAdoptionPanel td:nth-child(13) { width: 5% !important; }
+
+.puppyAdoptionPanel th:nth-child(9),
+.puppyAdoptionPanel th:nth-child(10) {
+  text-align: center !important;
+}
+
+.puppyAdoptionPanel td:nth-child(4),
+.puppyAdoptionPanel td:nth-child(9),
+.puppyAdoptionPanel td:nth-child(10),
+.puppyAdoptionPanel td.col-ageMonths,
+.puppyAdoptionPanel td.col-intakeAmount,
+.puppyAdoptionPanel td.col-finalPrice {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* Final excel-style table cleanup */
+.tableWrap {
+  width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: visible;
+}
+
+.data-table,
+.tableWrap .data-table,
+table.data-table,
+.statsTable.data-table,
+.crmHistoryTable.data-table,
+.puppySelectTable.data-table {
+  width: 100% !important;
+  table-layout: fixed !important;
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+  letter-spacing: 0 !important;
+}
+
+.data-table thead th,
+.data-table tbody td,
+table.data-table th,
+table.data-table td,
+.tableWrap table.data-table th,
+.tableWrap table.data-table td {
+  height: 34px !important;
+  padding: 7px 6px !important;
+  border-bottom: 1px solid rgba(120, 76, 43, 0.14) !important;
+  color: #342217 !important;
+  font-size: 11.5px !important;
+  line-height: 1.18 !important;
+  vertical-align: middle !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.data-table thead th,
+table.data-table th,
+.tableWrap table.data-table th {
+  height: 34px !important;
+  background: #ead2aa !important;
+  color: #55351f !important;
+  text-align: center !important;
+  font-weight: 700 !important;
+}
+
+.data-table tbody td,
+table.data-table td,
+.tableWrap table.data-table td {
+  background: #fff6e4 !important;
+  text-align: center !important;
+  font-weight: 700 !important;
+}
+
+.data-table tbody tr:hover td,
+table.data-table tbody tr:hover td {
+  background: #f1d7ad !important;
+}
+
+.data-table .num,
+.data-table .number,
+table.data-table td.num,
+table.data-table td.number,
+.tableWrap table.data-table td.num,
+.tableWrap table.data-table td.number,
+.data-table td.col-price,
+.data-table td.col-amount,
+.data-table td.col-totalAmount,
+.data-table td.col-salesAmount,
+.data-table td.col-settlementAmount,
+.data-table td.col-income,
+.data-table td.col-expense,
+.data-table td.col-profit,
+.data-table td.col-finalPrice,
+.data-table td.col-intakeAmount,
+.data-table td.col-adoptionPrice,
+.data-table td.col-budget,
+.data-table td.col-ageMonths,
+.data-table td.col-quantity,
+.data-table td.col-count,
+.data-table td.col-adoptionAmount,
+.data-table td.col-purchasePrice {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+.data-table th.num,
+.data-table th.number,
+.data-table th.col-price,
+.data-table th.col-amount,
+.data-table th.col-totalAmount,
+.data-table th.col-salesAmount,
+.data-table th.col-settlementAmount,
+.data-table th.col-income,
+.data-table th.col-expense,
+.data-table th.col-profit,
+.data-table th.col-finalPrice,
+.data-table th.col-intakeAmount,
+.data-table th.col-adoptionPrice,
+.data-table th.col-budget,
+.data-table th.col-ageMonths,
+.data-table th.col-quantity,
+.data-table th.col-count,
+.data-table th.col-adoptionAmount,
+.data-table th.col-purchasePrice {
+  text-align: center !important;
+}
+
+.data-table .date,
+.data-table .phone,
+.data-table td.col-date,
+.data-table td.col-arrival,
+.data-table td.col-completedDate,
+.data-table td.col-adoptionDate,
+.data-table td.col-visitDate,
+.data-table td.col-phone,
+.data-table td.col-ownerPhone {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+  font-size: 10.8px !important;
+  letter-spacing: 0 !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+.data-table .actionColumn,
+.data-table .actionCell,
+.data-table th.actionColumn,
+.data-table td.actionCell {
+  width: 48px !important;
+  min-width: 48px !important;
+  padding: 4px !important;
+  text-align: center !important;
+}
+
+.data-table .rowDeleteButton,
+.rowDeleteButton {
+  min-height: 24px !important;
+  padding: 3px 8px !important;
+  border-radius: 999px !important;
+  font-size: 10.5px !important;
+  line-height: 1 !important;
+}
+
+.data-table .col-dogName,
+.data-table .col-name,
+.data-table .col-petName,
+.data-table .col-puppyName { width: 8.5% !important; }
+.data-table .col-breed { width: 7.5% !important; }
+.data-table .col-gender { width: 5.5% !important; }
+.data-table .col-ageMonths { width: 6.5% !important; }
+.data-table .col-guardianName,
+.data-table .col-ownerName { width: 9% !important; }
+.data-table .col-phone,
+.data-table .col-ownerPhone { width: 12.5% !important; }
+.data-table .col-region { width: 8% !important; }
+.data-table .col-paymentMethod { width: 8.5% !important; }
+.data-table .col-price,
+.data-table .col-adoptionPrice,
+.data-table .col-finalPrice,
+.data-table .col-intakeAmount,
+.data-table .col-purchasePrice,
+.data-table .col-totalAmount,
+.data-table .col-amount,
+.data-table .col-salesAmount,
+.data-table .col-settlementAmount,
+.data-table .col-income,
+.data-table .col-expense,
+.data-table .col-profit,
+.data-table .col-budget { width: 8.5% !important; }
+.data-table .col-date,
+.data-table .col-arrival,
+.data-table .col-completedDate,
+.data-table .col-adoptionDate,
+.data-table .col-visitDate,
+.data-table .col-createdAt,
+.data-table .col-updatedAt { width: 11.5% !important; }
+.data-table .col-status,
+.data-table .col-paymentStatus,
+.data-table .col-settlementStatus { width: 7% !important; }
+.data-table .col-time { width: 7% !important; }
+.data-table .col-staff,
+.data-table .col-consultant,
+.data-table .col-manager { width: 8% !important; }
+.data-table .col-serviceType,
+.data-table .col-options,
+.data-table .col-itemType,
+.data-table .col-mainItem { width: 9% !important; }
+.data-table .col-memo,
+.data-table .col-specialNote,
+.data-table .col-summary,
+.data-table .col-title,
+.data-table .col-service,
+.data-table .col-content { width: 13% !important; }
+.data-table .col-vendor,
+.data-table .col-supplierName,
+.data-table .col-vendorName,
+.data-table .col-customerVendor { width: 10% !important; }
+
+.puppyAdoptionPanel .data-table th,
+.puppyAdoptionPanel .data-table td,
+.puppyAdoptionPanel table.data-table th,
+.puppyAdoptionPanel table.data-table td {
+  padding: 6px 3px !important;
+  font-size: 10.6px !important;
+}
+.puppyAdoptionPanel .data-table .col-dogName { width: 7.5% !important; }
+.puppyAdoptionPanel .data-table .col-breed { width: 6.5% !important; }
+.puppyAdoptionPanel .data-table .col-gender { width: 5% !important; }
+.puppyAdoptionPanel .data-table .col-ageMonths { width: 6% !important; }
+.puppyAdoptionPanel .data-table .col-guardianName { width: 8% !important; }
+.puppyAdoptionPanel .data-table .col-phone { width: 12% !important; font-size: 10px !important; }
+.puppyAdoptionPanel .data-table .col-region { width: 7% !important; }
+.puppyAdoptionPanel .data-table .col-paymentMethod { width: 8% !important; }
+.puppyAdoptionPanel .data-table .col-intakeAmount,
+.puppyAdoptionPanel .data-table .col-finalPrice { width: 8% !important; }
+.puppyAdoptionPanel .data-table .col-adoptionDate { width: 11% !important; font-size: 10px !important; }
+.puppyAdoptionPanel .data-table .col-status { width: 6% !important; }
+.puppyAdoptionPanel .data-table .actionColumn,
+.puppyAdoptionPanel .data-table .actionCell { width: 44px !important; min-width: 44px !important; }
+
+.reservationPanel .data-table .col-date,
+.groomingReservationPanel .data-table .col-date { width: 11.5% !important; font-size: 10px !important; }
+.reservationPanel .data-table .col-phone,
+.groomingReservationPanel .data-table .col-phone { width: 12.5% !important; font-size: 10px !important; }
+
+.crmHistoryTable.data-table .col-date { width: 118px !important; }
+.crmHistoryTable.data-table .col-type { width: 76px !important; }
+.crmHistoryTable.data-table .col-amount { width: 84px !important; }
+
+.statsTable.data-table {
+  min-width: 1120px !important;
+}
+.statsTable.data-table .col-date { width: 120px !important; }
+.statsTable.data-table .col-phone { width: 124px !important; }
+.statsTable.data-table .col-amount { width: 92px !important; }
+
+/* Final admin ledger and customer delete polish */
+.accountingStack .tableWrap {
+  overflow-x: auto !important;
+}
+
+.accountingStack .data-table,
+.accountingStack table.data-table {
+  width: 100% !important;
+  table-layout: fixed !important;
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+  background: #fffdf7 !important;
+}
+
+.accountingStack .data-table th,
+.accountingStack .data-table td,
+.accountingStack table.data-table th,
+.accountingStack table.data-table td {
+  height: 32px !important;
+  padding: 6px 8px !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+  vertical-align: middle !important;
+  white-space: nowrap !important;
+}
+
+.accountingStack .data-table th,
+.accountingStack table.data-table th {
+  background: #dec094 !important;
+  color: #4c311f !important;
+  text-align: center !important;
+  font-weight: 700 !important;
+}
+
+.accountingStack .data-table td,
+.accountingStack table.data-table td {
+  background: #fffdf7 !important;
+  color: #2f2118 !important;
+  text-align: center !important;
+  font-weight: 650 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.accountingStack .data-table tbody tr:hover td {
+  background: #f4e3c8 !important;
+}
+
+.accountingStack .data-table td.number,
+.accountingStack .data-table td.num,
+.accountingStack .data-table td.col-amount,
+.accountingStack .data-table td.col-income,
+.accountingStack .data-table td.col-expense,
+.accountingStack .data-table td.col-profit,
+.accountingStack .data-table td.col-salesAmount,
+.accountingStack .data-table td.col-settlementAmount,
+.accountingStack table.data-table td.number,
+.accountingStack table.data-table td.num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+.accountingStack .data-table th.number,
+.accountingStack .data-table th.num,
+.accountingStack .data-table th.col-amount,
+.accountingStack .data-table th.col-income,
+.accountingStack .data-table th.col-expense,
+.accountingStack .data-table th.col-profit,
+.accountingStack .data-table th.col-salesAmount,
+.accountingStack .data-table th.col-settlementAmount {
+  text-align: center !important;
+}
+
+.accountingStack .data-table td.date,
+.accountingStack .data-table td.col-date,
+.accountingStack .data-table td.col-month {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+  font-size: 11.2px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+.accountingStack .data-table .col-date { width: 13% !important; }
+.accountingStack .data-table .col-month { width: 14% !important; }
+.accountingStack .data-table .col-type { width: 9% !important; }
+.accountingStack .data-table .col-title { width: 26% !important; }
+.accountingStack .data-table .col-customerVendor { width: 18% !important; }
+.accountingStack .data-table .col-staff { width: 10% !important; }
+.accountingStack .data-table .col-amount,
+.accountingStack .data-table .col-income,
+.accountingStack .data-table .col-expense,
+.accountingStack .data-table .col-profit,
+.accountingStack .data-table .col-salesAmount,
+.accountingStack .data-table .col-settlementAmount { width: 13% !important; }
+.accountingStack .data-table .col-status,
+.accountingStack .data-table .col-needsCheck { width: 10% !important; }
+.accountingStack .data-table .col-dogName,
+.accountingStack .data-table .col-guardianName { width: 16% !important; }
+.accountingStack .data-table .col-receiptName { width: 24% !important; }
+
+.crmListRow {
+  grid-template-columns: minmax(0, 1fr) 38px !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+.crmListRow > .rowDeleteButton,
+.crmList .rowDeleteButton {
+  width: auto !important;
+  min-width: 34px !important;
+  max-width: 38px !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  padding: 2px 6px !important;
+  align-self: center !important;
+  justify-self: center !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  border: 1px solid rgba(126, 79, 44, 0.24) !important;
+  border-radius: 7px !important;
+  background: #9a5a45 !important;
+  color: #fffaf0 !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+  font-weight: 800 !important;
+  box-shadow: none !important;
+}
+
+.crmListRow > .rowDeleteButton:hover,
+.crmList .rowDeleteButton:hover {
+  background: #7f4435 !important;
+  border-color: rgba(100, 52, 34, 0.36) !important;
+}
+
+/* Final customer CRM delete X polish */
+.crmListRow {
+  display: block !important;
+  position: relative !important;
+}
+
+.crmList .crmSelectButton,
+.crmSelectButton {
+  position: relative !important;
+  display: block !important;
+  width: 100% !important;
+  min-height: 58px !important;
+  padding: 7px 8px 7px 28px !important;
+  border: 1px solid rgba(126, 79, 44, 0.16) !important;
+  border-radius: 10px !important;
+  background: #fff5e3 !important;
+  color: #37241a !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  box-shadow: 0 8px 18px rgba(72, 44, 28, 0.08) !important;
+}
+
+.crmListRow.selected .crmSelectButton,
+.crmListRow:hover .crmSelectButton,
+.crmSelectButton:focus-visible {
+  border-color: #a56d3e !important;
+  background: #f0d6ad !important;
+  outline: none !important;
+}
+
+.crmList .crmDeleteXButton,
+.crmDeleteXButton {
+  position: absolute !important;
+  top: 6px !important;
+  left: 6px !important;
+  z-index: 2 !important;
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  padding: 0 !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  border: 1px solid rgba(116, 74, 47, 0.22) !important;
+  border-radius: 999px !important;
+  background: #ead6b8 !important;
+  color: #6a4028 !important;
+  font-size: 13px !important;
+  line-height: 1 !important;
+  font-weight: 800 !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+}
+
+.crmList .crmDeleteXButton:hover,
+.crmDeleteXButton:hover {
+  background: #c99d6e !important;
+  color: #3d2619 !important;
+  border-color: rgba(91, 54, 32, 0.32) !important;
+}
+
+.crmList .crmDeleteXButton:focus-visible,
+.crmDeleteXButton:focus-visible {
+  outline: 2px solid rgba(155, 101, 56, 0.35) !important;
+  outline-offset: 2px !important;
+}
+

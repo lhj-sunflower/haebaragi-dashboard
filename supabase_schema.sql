@@ -48,6 +48,13 @@ create table if not exists public.supply_purchases (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.supply_vendors (
+  id text primary key,
+  data jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.accounting_entries (
   id text primary key,
   data jsonb not null default '{}'::jsonb,
@@ -72,6 +79,7 @@ begin
     'adoption_consultations',
     'puppies',
     'supply_purchases',
+    'supply_vendors',
     'accounting_entries',
     'settlement_entries'
   ] loop
@@ -95,5 +103,6 @@ create index if not exists grooming_reservations_updated_at_idx on public.groomi
 create index if not exists adoption_consultations_updated_at_idx on public.adoption_consultations (updated_at desc);
 create index if not exists puppies_updated_at_idx on public.puppies (updated_at desc);
 create index if not exists supply_purchases_updated_at_idx on public.supply_purchases (updated_at desc);
+create index if not exists supply_vendors_updated_at_idx on public.supply_vendors (updated_at desc);
 create index if not exists accounting_entries_updated_at_idx on public.accounting_entries (updated_at desc);
 create index if not exists settlement_entries_updated_at_idx on public.settlement_entries (updated_at desc);
