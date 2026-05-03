@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 import { createClient } from '@supabase/supabase-js'
@@ -445,12 +445,23 @@ async function readSupabaseCollection(key) {
 async function loadSupabaseDashboardData() {
   const result = {}
   let foundRemoteRows = false
-  await Promise.all(SUPABASE_DATA_KEYS.map(async (key) => {
-    const rows = await readSupabaseCollection(key)
-    result[key] = rows
-    if (rows.length > 0) foundRemoteRows = true
-  }))
-  return foundRemoteRows ? normalizeData({ ...seedData, ...result }) : null
+  const [customerRows] = await Promise.all([
+    readSupabaseCollection('customers').catch((error) => {
+      console.warn('customers Supabase 조회 실패, 파생 고객 목록을 사용합니다.', error)
+      return []
+    }),
+    Promise.all(SUPABASE_DATA_KEYS.map(async (key) => {
+      const rows = await readSupabaseCollection(key)
+      result[key] = rows
+      if (rows.length > 0) foundRemoteRows = true
+    })),
+  ])
+  return {
+    data: foundRemoteRows ? normalizeData({ ...seedData, ...result }) : null,
+    customers: customerRows,
+    hasCustomers: customerRows.length > 0,
+    foundRemoteRows,
+  }
 }
 async function syncSupabaseCollection(key, rows) {
   const table = SUPABASE_TABLES[key]
@@ -483,6 +494,23 @@ async function syncDashboardToSupabase(data, customers) {
     syncSupabaseCollection('customers', customers),
     ...SUPABASE_DATA_KEYS.map((key) => syncSupabaseCollection(key, data[key] || [])),
   ])
+}
+async function deleteSupabaseRecord(key, id) {
+  const table = SUPABASE_TABLES[key]
+  if (!table || !id) return
+  const { error } = await supabase.from(table).delete().eq('id', String(id))
+  if (error) throw error
+}
+async function upsertSupabaseRecord(key, item) {
+  const table = SUPABASE_TABLES[key]
+  if (!table || !item) return
+  const row = collectionRowsForSupabase(key, [item])[0]
+  const { error } = await supabase.from(table).upsert([row], { onConflict: 'id' })
+  if (error) throw error
+}
+function alertSupabaseError(error, message = 'Supabase 저장 중 오류가 발생했습니다.') {
+  console.error(message, error)
+  window.alert(message)
 }
 function syncDerivedData(data) {
   const withDefaults = { ...data, supplyVendors: data.supplyVendors || [] }
@@ -975,6 +1003,8 @@ function App() {
   const [settlementFilters, setSettlementFilters] = useState({ from: currentMonth + '-01', to: currentMonth + '-31', unpaidOnly: false })
   const [accountingTab, setAccountingTab] = useState(accountingTabs[0])
   const [supabaseLoaded, setSupabaseLoaded] = useState(false)
+  const [supabaseCustomers, setSupabaseCustomers] = useState({ loaded: false, rows: [] })
+  const remoteApplyingRef = useRef(false)
   const visibleTabs = useMemo(() => isAdmin(loginUser) ? tabs : tabs.filter((tab) => !isRestrictedTab(tab)), [loginUser])
 
   useEffect(() => {
@@ -984,18 +1014,18 @@ function App() {
   useEffect(() => {
     let mounted = true
     const localBackup = loadData()
-    const shouldUploadLocalBackup = hasLocalDashboardBackup()
     loadSupabaseDashboardData()
-      .then((remoteData) => {
+      .then((snapshot) => {
         if (!mounted) return
-        if (shouldUploadLocalBackup) {
-          setData(syncDerivedData(localBackup))
-          return
-        }
-        if (remoteData) setData(syncDerivedData(remoteData))
+        remoteApplyingRef.current = true
+        if (snapshot?.data) setData(syncDerivedData(snapshot.data))
+        else setData(syncDerivedData(localBackup))
+        if (snapshot?.hasCustomers) setSupabaseCustomers({ loaded: true, rows: snapshot.customers })
+        window.setTimeout(() => { remoteApplyingRef.current = false }, 800)
       })
       .catch((error) => {
-        console.error('Supabase 데이터 불러오기 실패, localStorage 백업을 사용합니다.', error)
+        console.error('Supabase 실시간 동기화 실패', error)
+        if (mounted) setData(syncDerivedData(localBackup))
       })
       .finally(() => {
         if (mounted) setSupabaseLoaded(true)
@@ -1040,21 +1070,58 @@ function App() {
   const attentionItems = [...data.groomingReservations, ...data.adoptionConsultations].filter((item) => item.date === today && item.status === '확인필요')
   const calendarDays = monthDays(currentMonth, activeGroomingReservations, data.adoptionConsultations)
   const rawCustomers = useMemo(() => buildCustomers(data), [data])
-  const customers = useMemo(() => rawCustomers.filter((customer) => !deletedCustomerPhones.includes(phoneDigits(customer.phone))), [rawCustomers, deletedCustomerPhones])
+  const customerSourceRows = supabaseCustomers.loaded ? supabaseCustomers.rows : rawCustomers
+  const customers = useMemo(() => customerSourceRows.filter((customer) => !deletedCustomerPhones.includes(phoneDigits(customer.phone))), [customerSourceRows, deletedCustomerPhones])
 
   useEffect(() => {
     localStorage.setItem('customers', JSON.stringify(customers))
   }, [customers])
 
   useEffect(() => {
-    if (!supabaseLoaded) return undefined
+    if (!supabaseLoaded || remoteApplyingRef.current) return undefined
     const timer = window.setTimeout(() => {
       syncDashboardToSupabase(data, customers).catch((error) => {
-        console.error('Supabase 저장 실패, localStorage 백업을 유지합니다.', error)
+        alertSupabaseError(error)
       })
     }, 400)
     return () => window.clearTimeout(timer)
   }, [data, customers, supabaseLoaded])
+
+  useEffect(() => {
+    if (!supabaseLoaded) return undefined
+    let disposed = false
+    let refreshTimer = null
+    const refreshFromSupabase = (includeCustomers = false) => {
+      if (refreshTimer) window.clearTimeout(refreshTimer)
+      refreshTimer = window.setTimeout(() => {
+        loadSupabaseDashboardData()
+          .then((snapshot) => {
+            if (disposed) return
+            remoteApplyingRef.current = true
+            if (snapshot?.data) setData(syncDerivedData(snapshot.data))
+            if (includeCustomers || snapshot?.hasCustomers) setSupabaseCustomers({ loaded: true, rows: snapshot?.customers || [] })
+            localStorage.setItem('lastSupabaseSyncMessage', '데이터가 동기화되었습니다.')
+            console.info('데이터가 동기화되었습니다.')
+            window.setTimeout(() => { remoteApplyingRef.current = false }, 800)
+          })
+          .catch((error) => {
+            console.error('Supabase 실시간 동기화 실패', error)
+          })
+      }, 250)
+    }
+    const channel = supabase.channel('haebaragi-dashboard-realtime')
+    ;(['customers', ...SUPABASE_DATA_KEYS]).forEach((key) => {
+      const table = SUPABASE_TABLES[key]
+      if (!table) return
+      channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => refreshFromSupabase(key === 'customers'))
+    })
+    channel.subscribe()
+    return () => {
+      disposed = true
+      if (refreshTimer) window.clearTimeout(refreshTimer)
+      supabase.removeChannel(channel)
+    }
+  }, [supabaseLoaded])
 
   const selectedCustomer = useMemo(() => customers.find((item) => item.phone === customerPhone) || customers[0] || null, [customerPhone, customers])
   const selectedCustomerHistory = useMemo(() => buildCustomerServiceHistory(data, selectedCustomer || { phone: customerPhone }), [selectedCustomer, customerPhone, data])
@@ -1089,14 +1156,19 @@ function App() {
     commit((prev) => ({ ...prev, groomingReservations: prev.groomingReservations.map((item) => item.id === normalized.id ? normalized : item) }))
     setModal(null)
   }
-  function deleteGrooming(id) {
+  async function deleteGrooming(id) {
     if (!isAdmin(loginUser)) {
       window.alert('삭제는 관리자만 가능합니다.')
       return
     }
-    if (!window.confirm('정말 삭제하시겠습니까?')) return
-    commit((prev) => ({ ...prev, groomingReservations: prev.groomingReservations.filter((item) => item.id !== id) }))
-    setModal(null)
+    if (!window.confirm('이 예약을 삭제하시겠습니까?')) return
+    try {
+      await deleteSupabaseRecord('groomingReservations', id)
+      commit((prev) => ({ ...prev, groomingReservations: prev.groomingReservations.filter((item) => item.id !== id) }))
+      setModal(null)
+    } catch (error) {
+      alertSupabaseError(error, 'Supabase 저장 중 오류가 발생했습니다.')
+    }
   }
   function addSupply(event) {
     event.preventDefault()
@@ -1119,25 +1191,35 @@ function App() {
     commit((prev) => ({ ...prev, supplyVendors: (prev.supplyVendors || []).map((item) => item.id === normalized.id ? normalized : item) }))
     setModal(null)
   }
-  function deleteSupplyVendor(itemOrId) {
+  async function deleteSupplyVendor(itemOrId) {
     if (!isAdmin(loginUser)) {
       window.alert('삭제는 관리자만 가능합니다.')
       return
     }
     const id = typeof itemOrId === 'object' ? itemOrId.id : itemOrId
     if (!window.confirm('정말 삭제하시겠습니까?')) return
-    commit((prev) => ({ ...prev, supplyVendors: (prev.supplyVendors || []).filter((item) => item.id !== id) }))
-    setModal(null)
+    try {
+      await deleteSupabaseRecord('supplyVendors', id)
+      commit((prev) => ({ ...prev, supplyVendors: (prev.supplyVendors || []).filter((item) => item.id !== id) }))
+      setModal(null)
+    } catch (error) {
+      alertSupabaseError(error, 'Supabase 저장 중 오류가 발생했습니다.')
+    }
   }
-  function deleteSupply(itemOrId) {
+  async function deleteSupply(itemOrId) {
     if (!isAdmin(loginUser)) {
       window.alert('삭제는 관리자만 가능합니다.')
       return
     }
     const id = typeof itemOrId === 'object' ? itemOrId.id : itemOrId
     if (!window.confirm('정말 삭제하시겠습니까?')) return
-    commit((prev) => ({ ...prev, supplyPurchases: prev.supplyPurchases.filter((item) => item.id !== id) }))
-    setModal(null)
+    try {
+      await deleteSupabaseRecord('supplyPurchases', id)
+      commit((prev) => ({ ...prev, supplyPurchases: prev.supplyPurchases.filter((item) => item.id !== id) }))
+      setModal(null)
+    } catch (error) {
+      alertSupabaseError(error, 'Supabase 저장 중 오류가 발생했습니다.')
+    }
   }
   function addAccounting(event) {
     event.preventDefault()
@@ -1204,25 +1286,40 @@ function App() {
     })
     setModal(null)
   }
-  function deleteAdoptionHistory(item) {
+  async function deleteAdoptionHistory(item) {
     if (!isAdmin(loginUser)) {
       window.alert('삭제는 관리자만 가능합니다.')
       return
     }
     if (!window.confirm('해당 입양 관리 내역을 삭제하시겠습니까?')) return
-    commit((prev) => {
-      if (item.sourceKind === 'adoption') return { ...prev, adoptionConsultations: prev.adoptionConsultations.filter((row) => row.id !== item.sourceId) }
-      if (item.sourceKind === 'puppy') return { ...prev, puppies: prev.puppies.filter((row) => row.id !== item.sourceId) }
-      return prev
-    })
-    setModal(null)
+    try {
+      if (item.sourceKind === 'adoption') await deleteSupabaseRecord('adoptionConsultations', item.sourceId)
+      if (item.sourceKind === 'puppy') await deleteSupabaseRecord('puppies', item.sourceId)
+      commit((prev) => {
+        if (item.sourceKind === 'adoption') return { ...prev, adoptionConsultations: prev.adoptionConsultations.filter((row) => row.id !== item.sourceId) }
+        if (item.sourceKind === 'puppy') return { ...prev, puppies: prev.puppies.filter((row) => row.id !== item.sourceId) }
+        return prev
+      })
+      setModal(null)
+    } catch (error) {
+      alertSupabaseError(error, 'Supabase 저장 중 오류가 발생했습니다.')
+    }
   }
-  function deleteAdoption(item) {
-    const hasAccounting = data.accountingEntries.some((entry) => entry.sourceId === item.id || String(entry.sourceId || '').includes(item.id)) || ['입양완료', '분양완료'].includes(item.status)
+  async function deleteAdoption(item) {
+    if (!isAdmin(loginUser)) {
+      window.alert('삭제는 관리자만 가능합니다.')
+      return
+    }
+    const hasAccounting = data.accountingEntries.some((entry) => entry.sourceId === item.id || String(entry.sourceId || '').includes(item.id)) || ['입양완료', '입양완료'].includes(item.status)
     const message = hasAccounting ? '회계장부에 반영된 데이터일 수 있습니다. 삭제하시겠습니까?' : '해당 데이터를 삭제하시겠습니까?'
     if (!window.confirm(message)) return
-    commit((prev) => ({ ...prev, adoptionConsultations: prev.adoptionConsultations.filter((row) => row.id !== item.id) }))
-    setModal(null)
+    try {
+      await deleteSupabaseRecord('adoptionConsultations', item.id)
+      commit((prev) => ({ ...prev, adoptionConsultations: prev.adoptionConsultations.filter((row) => row.id !== item.id) }))
+      setModal(null)
+    } catch (error) {
+      alertSupabaseError(error, 'Supabase 저장 중 오류가 발생했습니다.')
+    }
   }
   function savePuppy(next) {
     const normalized = toPuppy(next)
@@ -1244,12 +1341,22 @@ function App() {
     commit((prev) => ({ ...prev, puppies: [normalized, ...prev.puppies] }))
     setModal(null)
   }
-  function deletePuppy(itemOrId) {
+  async function deletePuppy(itemOrId) {
+    if (!isAdmin(loginUser)) {
+      window.alert('삭제는 관리자만 가능합니다.')
+      return
+    }
     const target = typeof itemOrId === 'object' ? itemOrId : data.puppies.find((item) => item.id === itemOrId)
+    const id = target?.id || itemOrId
     const message = target && ['입양완료', '분양완료'].includes(target.status) ? '회계장부에 반영된 데이터일 수 있습니다. 삭제하시겠습니까?' : '해당 데이터를 삭제하시겠습니까?'
     if (!window.confirm(message)) return
-    commit((prev) => ({ ...prev, puppies: prev.puppies.filter((item) => item.id !== (target?.id || itemOrId)) }))
-    setModal(null)
+    try {
+      await deleteSupabaseRecord('puppies', id)
+      commit((prev) => ({ ...prev, puppies: prev.puppies.filter((item) => item.id !== id) }))
+      setModal(null)
+    } catch (error) {
+      alertSupabaseError(error, 'Supabase 저장 중 오류가 발생했습니다.')
+    }
   }
   function completePuppyAdoption(next) {
     if (!window.confirm('입양완료 처리하면 퍼피 프로파일 목록에서 사라지고 퍼피 입양 관리 내역으로 이동됩니다. 계속하시겠습니까?')) return
@@ -1264,22 +1371,28 @@ function App() {
     commit((prev) => ({ ...prev, settlementEntries: prev.settlementEntries.map((item) => item.id === id ? { ...item, status } : item), accountingEntries: prev.accountingEntries.map((item) => item.id === id.replace('set-', 'acc-grooming-') ? { ...item, settlementStatus: status } : item) }))
     setModal(null)
   }
-  function deleteCustomer(customer) {
+  async function deleteCustomer(customer) {
     if (!isAdmin(loginUser)) {
       window.alert('삭제는 관리자만 가능합니다.')
       return
     }
     if (!customer?.phone) return
     if (!window.confirm('\uD574\uB2F9 \uACE0\uAC1D \uC815\uBCF4\uB97C \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?')) return
-    const phoneKey = phoneDigits(customer.phone)
-    setDeletedCustomerPhones((prev) => Array.from(new Set([...prev, phoneKey])))
-    setCustomerMemos((prev) => {
-      const next = { ...prev }
-      delete next[customer.phone]
-      delete next[phoneKey]
-      return next
-    })
-    if (phoneDigits(customerPhone) === phoneKey) setCustomerPhone('')
+    try {
+      await deleteSupabaseRecord('customers', customer.id || customer.phone)
+      const phoneKey = phoneDigits(customer.phone)
+      setDeletedCustomerPhones((prev) => Array.from(new Set([...prev, phoneKey])))
+      setSupabaseCustomers((prev) => prev.loaded ? { loaded: true, rows: prev.rows.filter((item) => phoneDigits(item.phone) !== phoneKey) } : prev)
+      setCustomerMemos((prev) => {
+        const next = { ...prev }
+        delete next[customer.phone]
+        delete next[phoneKey]
+        return next
+      })
+      if (phoneDigits(customerPhone) === phoneKey) setCustomerPhone('')
+    } catch (error) {
+      alertSupabaseError(error, 'Supabase 저장 중 오류가 발생했습니다.')
+    }
   }
   function chooseExistingCustomer(customer) {
     const latest = data.groomingReservations.find((item) => item.phone === customer.phone) || customer
