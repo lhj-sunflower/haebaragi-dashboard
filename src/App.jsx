@@ -3,10 +3,9 @@ import './App.css'
 
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  'https://wtvhghduhnyefewuvcpc.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0dmhnaGR1aG55ZWZld3V2Y3BjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2ODg5NjksImV4cCI6MjA5MzI2NDk2OX0.fyjCAAszJqaBi8c0NdiUZdGlPOFlMOoUwoAdvQbdOUY'
-)
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://wtvhghduhnyefewuvcpc.supabase.co'
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0dmhnaGR1aG55ZWZld3V2Y3BjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2ODg5NjksImV4cCI6MjA5MzI2NDk2OX0.fyjCAAszJqaBi8c0NdiUZdGlPOFlMOoUwoAdvQbdOUY'
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 const STORAGE_KEY = 'haebaragi-puppyhouse-final-dashboard-v3'
 const LEGACY_KEY = 'haebaragi-puppyhouse-final-dashboard-v2'
 const today = (() => {
@@ -88,6 +87,9 @@ function replaceRole(value) {
 }
 function phoneDigits(value) {
   return String(value || '').replace(/\D/g, '').slice(0, 11)
+}
+function normalizePhone(value) {
+  return phoneDigits(value)
 }
 function formatPhoneNumber(value) {
   const digits = phoneDigits(value)
@@ -192,6 +194,12 @@ function toGrooming(item) {
     paymentStatus: item.paymentStatus || (item.status === '결제완료' ? '결제완료' : '미결제'),
     paymentMethod: normalizePaymentMethod(item.paymentMethod || item.payment || '카드'),
     price: moneyNumber(item.price),
+    customerId: normalizeCustomerId(item.customerId || ''),
+    gender: item.gender || '',
+    age: item.age || item.ageMonths || '',
+    ageMonths: item.ageMonths || item.age || '',
+    visitSource: item.visitSource || item.visitPath || '',
+    visitPath: item.visitPath || item.visitSource || '',
     customerType: item.customerType || '기존 고객',
     memo: item.memo || '',
   }
@@ -427,7 +435,148 @@ function supabaseRowId(item, fallback) {
   return String(item?.id || item?.phone || item?.profileNo || fallback)
 }
 function collectionRowsForSupabase(key, rows) {
-  return (rows || []).map((item, index) => ({ id: supabaseRowId(item, key + '-' + index), data: item }))
+  return (rows || []).map((item, index) => {
+    const normalized = key === 'customers' ? normalizeCustomerRecord(item) : item
+    return { id: supabaseRowId(normalized, key + '-' + index), data: normalized }
+  })
+}
+function customerOwnerName(item = {}) {
+  return item.guardianName || item.ownerName || item.customerName || ''
+}
+function customerPhone(item = {}) {
+  return formatPhoneNumber(item.phone || item.ownerPhone || item.guardianPhone || '')
+}
+function customerDogName(item = {}) {
+  return item.dogName || item.petName || item.name || ''
+}
+function customerLookupKey(item = {}) {
+  const digits = normalizePhone(item.phone || item.ownerPhone || item.guardianPhone || '')
+  if (digits) return 'phone-' + digits
+  const owner = customerOwnerName(item).trim()
+  const dog = customerDogName(item).trim()
+  return owner && dog ? 'name-' + owner + '-' + dog : ''
+}
+function normalizeCustomerId(value) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  const decoded = text.replace(/%3A/gi, ':').replace(/%2D/gi, '-')
+  const phoneMatch = decoded.match(/^c-phone[:-](\d{7,11})$/)
+  if (phoneMatch) return 'c-phone-' + normalizePhone(phoneMatch[1])
+  const rawDigits = normalizePhone(decoded)
+  if (decoded.startsWith('c-phone') && rawDigits) return 'c-phone-' + rawDigits
+  return text
+}
+function customerIdFromRecord(item = {}) {
+  const normalizedPhone = normalizePhone(item.phone || item.ownerPhone || item.guardianPhone || '')
+  if (normalizedPhone) return 'c-phone-' + normalizedPhone
+  const normalizedId = normalizeCustomerId(item.id || item.customerId || '')
+  if (normalizedId) return normalizedId
+  const lookup = customerLookupKey(item).replace(/[^a-zA-Z0-9-]/g, '-')
+  return lookup ? 'c-' + lookup : ''
+}
+function normalizeCustomerRecord(item = {}) {
+  const now = new Date().toISOString()
+  const guardianName = customerOwnerName(item)
+  const phone = customerPhone(item)
+  const dogName = customerDogName(item)
+  const visitCount = Number(item.visitCount || 0)
+  const totalPaid = moneyNumber(item.totalPaid)
+  const grooming = Number(item.grooming || 0)
+  const adoption = Number(item.adoption || 0)
+  const grade = item.grade || (visitCount >= 10 || totalPaid >= 1000000 ? 'VIP' : visitCount >= 5 ? '\uB2E8\uACE8' : visitCount >= 2 ? '\uC7AC\uBC29\uBB38' : '\uC2E0\uADDC')
+  const customerType = item.customerType || [grooming > 0 ? '\uBBF8\uC6A9\uACE0\uAC1D' : null, adoption > 0 ? '\uC785\uC591\uACE0\uAC1D' : null].filter(Boolean).join(' \u00B7 ') || '\uC77C\uBC18\uACE0\uAC1D'
+  const badges = Array.isArray(item.badges) && item.badges.length ? item.badges : [grade, grooming > 0 ? '\uBBF8\uC6A9\uACE0\uAC1D' : null, adoption > 0 ? '\uC785\uC591\uACE0\uAC1D' : null].filter(Boolean)
+  const customerId = customerIdFromRecord({ ...item, phone, ownerPhone: phone, guardianName, ownerName: guardianName, dogName })
+  return {
+    ...item,
+    id: customerId || 'c-' + Date.now(),
+    ownerName: guardianName,
+    ownerPhone: phone,
+    guardianName,
+    phone,
+    dogName,
+    breed: item.breed || '-',
+    gender: item.gender || '',
+    age: item.age || item.ageMonths || '',
+    ageMonths: item.ageMonths || item.age || '',
+    memo: item.memo || item.specialNote || '',
+    specialNote: item.specialNote || item.memo || '',
+    visitSource: item.visitSource || item.visitPath || '',
+    visitPath: item.visitPath || item.visitSource || '',
+    grooming,
+    adoption,
+    visitCount,
+    totalPaid,
+    lastVisitDate: item.lastVisitDate || '',
+    grade,
+    customerType,
+    badges,
+    createdAt: item.createdAt || now,
+    updatedAt: item.updatedAt || now,
+  }
+}
+function customerMatchesSource(customer = {}, source = {}) {
+  const customerId = normalizeCustomerId(customer.id || customer.customerId || '')
+  const sourceCustomerId = normalizeCustomerId(source.customerId || source.id || '')
+  if (customerId && sourceCustomerId && customerId === sourceCustomerId) return true
+  const customerDigits = normalizePhone(customer.phone || customer.ownerPhone || customer.guardianPhone || '')
+  const sourceDigits = normalizePhone(source.phone || source.ownerPhone || source.guardianPhone || '')
+  if (customerDigits && sourceDigits && customerDigits === sourceDigits) return true
+  const customerOwner = customerOwnerName(customer).trim()
+  const sourceOwner = customerOwnerName(source).trim()
+  const customerDog = customerDogName(customer).trim()
+  const sourceDog = customerDogName(source).trim()
+  return Boolean(customerOwner && sourceOwner && customerDog && sourceDog && customerOwner === sourceOwner && customerDog === sourceDog)
+}
+function findMatchingCustomer(rows = [], source = {}) {
+  return (rows || []).map(normalizeCustomerRecord).find((customer) => customerMatchesSource(customer, source)) || null
+}
+function customerFromGroomingReservation(grooming, existingCustomer, { incrementVisit = false } = {}) {
+  const existing = existingCustomer ? normalizeCustomerRecord(existingCustomer) : {}
+  const now = new Date().toISOString()
+  const paidAmount = grooming.paymentStatus === '\uACB0\uC81C\uC644\uB8CC' ? moneyNumber(grooming.price) : 0
+  const nextVisitCount = Number(existing.visitCount || 0) + (incrementVisit ? 1 : 0)
+  const nextGrooming = Number(existing.grooming || 0) + (incrementVisit ? 1 : 0)
+  const nextTotalPaid = moneyNumber(existing.totalPaid) + (incrementVisit ? paidAmount : 0)
+  const lastVisitDate = grooming.date && (!existing.lastVisitDate || grooming.date > existing.lastVisitDate) ? grooming.date : existing.lastVisitDate || grooming.date || ''
+  return normalizeCustomerRecord({
+    ...existing,
+    id: existing.id,
+    guardianName: grooming.guardianName || existing.guardianName || existing.ownerName || '',
+    ownerName: grooming.guardianName || existing.ownerName || existing.guardianName || '',
+    phone: grooming.phone || existing.phone || existing.ownerPhone || '',
+    ownerPhone: grooming.phone || existing.ownerPhone || existing.phone || '',
+    dogName: grooming.dogName || existing.dogName || '',
+    breed: grooming.breed || existing.breed || '',
+    gender: grooming.gender || existing.gender || '',
+    age: grooming.age || grooming.ageMonths || existing.age || existing.ageMonths || '',
+    ageMonths: grooming.ageMonths || grooming.age || existing.ageMonths || existing.age || '',
+    memo: grooming.memberMemo || grooming.specialNote || grooming.memo || existing.memo || existing.specialNote || '',
+    specialNote: grooming.specialNote || grooming.memberMemo || grooming.memo || existing.specialNote || existing.memo || '',
+    visitSource: grooming.visitSource || grooming.visitPath || existing.visitSource || existing.visitPath || '',
+    visitPath: grooming.visitPath || grooming.visitSource || existing.visitPath || existing.visitSource || '',
+    grooming: nextGrooming,
+    visitCount: nextVisitCount,
+    totalPaid: nextTotalPaid,
+    lastVisitDate,
+    createdAt: existing.createdAt || now,
+    updatedAt: now,
+  })
+}
+function upsertCustomerRows(rows = [], customer) {
+  const normalized = normalizeCustomerRecord(customer)
+  const next = []
+  let replaced = false
+  ;(rows || []).map(normalizeCustomerRecord).forEach((row) => {
+    if (customerMatchesSource(row, normalized)) {
+      if (!replaced) next.push({ ...row, ...normalized, createdAt: row.createdAt || normalized.createdAt, updatedAt: normalized.updatedAt })
+      replaced = true
+    } else {
+      next.push(row)
+    }
+  })
+  if (!replaced) next.unshift(normalized)
+  return next
 }
 async function readSupabaseCollection(key) {
   const table = SUPABASE_TABLES[key]
@@ -440,7 +589,10 @@ async function readSupabaseCollection(key) {
     }
     throw error
   }
-  return (rows || []).map((row) => ({ id: row.id, ...(row.data || {}) }))
+  return (rows || []).map((row) => {
+    const item = { id: row.id, ...(row.data || {}) }
+    return key === 'customers' ? normalizeCustomerRecord(item) : item
+  })
 }
 async function loadSupabaseDashboardData() {
   const result = {}
@@ -506,11 +658,19 @@ async function upsertSupabaseRecord(key, item) {
   if (!table || !item) return
   const row = collectionRowsForSupabase(key, [item])[0]
   const { error } = await supabase.from(table).upsert([row], { onConflict: 'id' })
-  if (error) throw error
+  if (error) {
+    console.error('Supabase upsert failed', { key, table, row, error })
+    throw error
+  }
 }
-function alertSupabaseError(error, message = 'Supabase 저장 중 오류가 발생했습니다.') {
+function supabaseErrorDetails(error) {
+  return [error?.message, error?.details, error?.hint, error?.code ? 'code: ' + error.code : ''].filter(Boolean).join('\n')
+}
+function alertSupabaseError(error, message = '\u0053upabase \uC800\uC7A5 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.') {
+  const details = supabaseErrorDetails(error)
+  const text = details ? message + '\n\n' + details : message
   console.error(message, error)
-  window.alert(message)
+  window.alert(text)
 }
 function syncDerivedData(data) {
   const withDefaults = { ...data, supplyVendors: data.supplyVendors || [] }
@@ -1141,10 +1301,31 @@ function App() {
   const monthYesulSettlement = sumSettlement(data.settlementEntries, (item) => item.date.startsWith(currentMonth))
   const filteredSettlements = data.settlementEntries.filter((item) => (!settlementFilters.from || item.date >= settlementFilters.from) && (!settlementFilters.to || item.date <= settlementFilters.to) && (!settlementFilters.unpaidOnly || item.status !== '정산완료'))
 
+  async function saveGroomingReservationWithCustomer(reservation, { isNew = false } = {}) {
+    const base = toGrooming({ ...reservation, id: reservation.id || `g-${Date.now()}` })
+    const matchedCustomer = findMatchingCustomer(customers, base)
+    const customer = customerFromGroomingReservation(base, matchedCustomer, { incrementVisit: isNew })
+    const normalized = toGrooming({ ...base, customerId: customer.id })
+    const nextCustomers = upsertCustomerRows(customers, customer)
+    try {
+      console.info('Supabase grooming save start', { url: SUPABASE_URL, role: loginUser?.role || 'none', customerId: customer.id, reservationId: normalized.id })
+      await upsertSupabaseRecord('customers', customer)
+      await upsertSupabaseRecord('groomingReservations', normalized)
+      setSupabaseCustomers({ loaded: true, rows: nextCustomers })
+      localStorage.setItem('customers', JSON.stringify(nextCustomers))
+      if (isNew) {
+        commit((prev) => ({ ...prev, groomingReservations: [normalized, ...prev.groomingReservations] }))
+      } else {
+        commit((prev) => ({ ...prev, groomingReservations: prev.groomingReservations.map((item) => item.id === normalized.id ? normalized : item) }))
+      }
+      setModal(null)
+    } catch (error) {
+      console.error('Grooming customer/reservation Supabase save failed', { role: loginUser?.role || 'none', customer, reservation: normalized, error })
+      alertSupabaseError(error, '\uACE0\uAC1D \uC800\uC7A5 \uB610\uB294 \uC608\uC57D \uC800\uC7A5 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4. \uACE0\uAC1D\uC774 \uC800\uC7A5\uB418\uC9C0 \uC54A\uC544 \uC608\uC57D\uB3C4 \uC800\uC7A5\uD558\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.')
+    }
+  }
   function createGrooming(reservation) {
-    const normalized = toGrooming({ ...reservation, id: reservation.id || `g-${Date.now()}` })
-    commit((prev) => ({ ...prev, groomingReservations: [normalized, ...prev.groomingReservations] }))
-    setModal(null)
+    saveGroomingReservationWithCustomer(reservation, { isNew: true })
   }
   function addGrooming(event) {
     event.preventDefault()
@@ -1152,9 +1333,7 @@ function App() {
     setGroomingForm(defaultGroomingForm())
   }
   function saveGrooming(next) {
-    const normalized = toGrooming(next)
-    commit((prev) => ({ ...prev, groomingReservations: prev.groomingReservations.map((item) => item.id === normalized.id ? normalized : item) }))
-    setModal(null)
+    saveGroomingReservationWithCustomer(next, { isNew: false })
   }
   async function deleteGrooming(id) {
     if (!isAdmin(loginUser)) {
