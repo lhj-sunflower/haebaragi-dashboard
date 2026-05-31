@@ -4651,3 +4651,70 @@ table.data-table td.number,
     justify-content: center;
   }
 }
+
+
+.ledgerDateBar {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) auto minmax(130px, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(122, 75, 42, 0.12);
+  border-radius: 14px;
+  background: #fff8ea;
+}
+
+.ledgerDateBar > strong {
+  color: #5b3824;
+  font-size: 16px;
+  font-weight: 950;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.ledgerDateBar > span {
+  justify-self: end;
+  color: #8a6645;
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.ledgerDateControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ledgerDateControls button {
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 1px solid rgba(122, 75, 42, 0.2);
+  border-radius: 999px;
+  background: #fff4dd;
+  color: #5b3824;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.ledgerDateControls button:hover {
+  background: #7a4b2a;
+  color: #fffaf0;
+}
+
+.ledgerDayPanel .emptyState {
+  min-height: 150px;
+}
+
+@media (max-width: 860px) {
+  .ledgerDateBar {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .ledgerDateBar > span {
+    justify-self: center;
+  }
+}
