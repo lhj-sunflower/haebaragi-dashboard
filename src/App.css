@@ -4592,3 +4592,62 @@ table.data-table td.number,
     flex-basis: 30px;
   }
 }
+
+
+.calendarMonthBar {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) auto minmax(110px, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.calendarMonthBar > strong {
+  min-width: 130px;
+  color: #5b3824;
+  font-size: 18px;
+  font-weight: 950;
+  text-align: center;
+  letter-spacing: 0;
+}
+
+.calendarMonthControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.calendarMonthControls:last-child {
+  justify-content: flex-end;
+}
+
+.calendarMonthControls button {
+  min-width: 34px;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid rgba(122, 75, 42, 0.2);
+  border-radius: 999px;
+  background: #fff4dd;
+  color: #5b3824;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.calendarMonthControls button:hover {
+  background: #7a4b2a;
+  color: #fffaf0;
+}
+
+@media (max-width: 760px) {
+  .calendarMonthBar {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .calendarMonthControls,
+  .calendarMonthControls:last-child {
+    justify-content: center;
+  }
+}

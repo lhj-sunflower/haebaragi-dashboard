@@ -782,6 +782,15 @@ function dateOffset(baseDate, offsetDays) {
   date.setDate(date.getDate() + offsetDays)
   return date.toISOString().slice(0, 10)
 }
+function shiftMonthValue(month, offset) {
+  const [year, monthNumber] = String(month || currentMonth).split('-').map(Number)
+  const date = new Date(year, monthNumber - 1 + offset, 1)
+  return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0')
+}
+function formatMonthTitle(month) {
+  const [year, monthNumber] = String(month || currentMonth).split('-')
+  return year + '\uB144 ' + Number(monthNumber) + '\uC6D4'
+}
 function currentDateString() {
   const now = new Date()
   const year = now.getFullYear()
@@ -1676,8 +1685,11 @@ function CareReservationCard({ item, setModal }) {
   return <button className={`careReservationCard compactCareCard status-${statusTone(status)}`} type="button" onClick={() => setModal({ type: 'edit-grooming', title: petLabel(item), item: { ...item, status } })}><span className="compactCareTime">{displayValue(item, 'time')}</span><strong>{displayValue(item, 'dogName')}</strong><span>{displayValue(item, 'serviceType')}</span><span>{displayValue(item, 'options')}</span><b>{displayValue(item, 'paymentStatus')}</b><i className={`statusDot status-${statusTone(status)}`} title={status} aria-label={status} /></button>
 }
 function CareCalendar({ rows, setModal }) {
-  const days = monthDays(currentMonth, rows, [])
-  return <section className="panel careCalendarPanel"><div className="panelTitle"><h2>월간 케어 캘린더</h2><span>{currentMonth}</span></div><div className="calendarWeek"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div><div className="calendarGrid careCalendarGrid">{days.map((day) => day.blank ? <div className="calendarBlank" key={day.key} /> : <button className="calendarDay careCalendarDay" type="button" key={day.key} onClick={() => setModal({ type: 'grooming-day-list', title: formatDateWithDay(day.date) + ' 케어 예약', list: day.entries })}><strong>{day.label}</strong>{day.entries.slice(0, 4).map((item) => <span className={`careCalendarItem ${staffClass(item.staff)}`} key={item.id}>{item.time || '-'} {item.staff || '-'} {item.dogName || '-'}</span>)}{day.entries.length > 4 && <small>외 {day.entries.length - 4}건</small>}</button>)}</div></section>
+  const [viewMonth, setViewMonth] = useState(currentMonth)
+  const days = monthDays(viewMonth, rows, [])
+  const weekDays = ['\uC77C', '\uC6D4', '\uD654', '\uC218', '\uBAA9', '\uAE08', '\uD1A0']
+  const moveMonth = (offset) => setViewMonth((value) => shiftMonthValue(value, offset))
+  return <section className="panel careCalendarPanel"><div className="calendarMonthBar"><div className="calendarMonthControls"><button type="button" onClick={() => moveMonth(-1)}>{'<'}</button><button type="button" onClick={() => setViewMonth(currentMonth)}>{'\uC624\uB298'}</button></div><strong>{formatMonthTitle(viewMonth)}</strong><div className="calendarMonthControls"><button type="button" onClick={() => moveMonth(1)}>{'>'}</button></div></div><div className="calendarWeek">{weekDays.map((day) => <span key={day}>{day}</span>)}</div><div className="calendarGrid careCalendarGrid">{days.map((day) => day.blank ? <div className="calendarBlank" key={day.key} /> : <button className="calendarDay careCalendarDay" type="button" key={day.key} onClick={() => setModal({ type: 'grooming-day-list', title: formatDateWithDay(day.date) + ' \uCF00\uC5B4 \uC608\uC57D', list: sortByDateTime(day.entries) })}><strong>{day.label}</strong>{day.entries.slice(0, 4).map((item) => <span className={`careCalendarItem ${staffClass(item.staff)}`} key={item.id}>{item.time || '-'} {item.staff || '-'} {item.dogName || '-'}</span>)}{day.entries.length > 4 && <small>{'\uC678 '}{day.entries.length - 4}{'\uAC74'}</small>}</button>)}</div></section>
 }
 function completedAdoptionRows(data) {
   const rows = []
